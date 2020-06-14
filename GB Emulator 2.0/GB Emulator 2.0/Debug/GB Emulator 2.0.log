@@ -1,0 +1,12 @@
+﻿  GB.cpp
+C:\Users\Tom\Documents\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(860,48): warning C4305: 'argument': truncation from 'const int' to 'ui8'
+C:\Users\Tom\Documents\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(860,33): warning C4309: 'argument': truncation of constant value
+C:\Users\Tom\Documents\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(869,28): warning C4305: 'argument': truncation from 'const int' to 'ui8'
+C:\Users\Tom\Documents\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(869,11): warning C4309: 'argument': truncation of constant value
+C:\Users\Tom\Documents\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(877,30): warning C4305: 'argument': truncation from 'const int' to 'ui8'
+C:\Users\Tom\Documents\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(877,13): warning C4309: 'argument': truncation of constant value
+  main.cpp
+C:\Users\Tom\Documents\GB Emulator 2.0\GB Emulator 2.0\main.cpp(14,6): warning C4101: 'cycles': unreferenced local variable
+  Generating Code...
+C:\Users\Tom\Documents\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(2380): warning C4715: 'GB::handleHBlankMode': not all control paths return a value
+  GB Emulator 2.0.vcxproj -> C:\Users\Tom\Documents\GB Emulator 2.0\Debug\GB Emulator 2.0.exe
