@@ -352,22 +352,18 @@ void GB::INCByteRegister(const ui8& reg) //Increments register and sets flags (Z
 
 	ClearFlags();
 
+	GetByteRegister(reg)++;
+
 	if (hasCarry == true)
 	{
 		SetFlag(FLAG_CARRY);
 	}
-
-	GetByteRegister(reg)++;
 
 	//UnsetFlag(FLAG_SUBTRACT); // Always reset
 
 	if (GetByteRegister(reg) == 0) // Set if 0
 	{
 		SetFlag(FLAG_ZERO);
-	}
-	else
-	{
-		UnsetFlag(FLAG_ZERO);
 	}
 
 	if ((GetByteRegister(reg) & 0x0F) == 0x00) // Set if carry from bit 3
@@ -395,20 +391,12 @@ void GB::DECByteRegister(const ui8& reg)
 	{
 		SetFlag(FLAG_ZERO);
 	}
-	else
-	{
-		UnsetFlag(FLAG_ZERO);
-	}
 
 	SetFlag(FLAG_SUBTRACT);
 
 	if ((GetByteRegister(reg) & 0x0F) == 0x0F) // Set if no borrow from bit 4
 	{
 		SetFlag(FLAG_HALFCARRY);
-	}
-	else
-	{
-		UnsetFlag(FLAG_HALFCARRY);
 	}
 }
 
@@ -451,10 +439,6 @@ void GB::ADDHL(const ui16& reg)
 	{
 		SetFlag(FLAG_ZERO);
 	}
-	else
-	{
-		UnsetFlag(FLAG_ZERO);
-	}
 
 	if (result & 0x10000)
 	{
@@ -477,10 +461,6 @@ void GB::Bit(const ui8& value, ui8 bit)
 	{
 		SetFlag(FLAG_ZERO); // Set in the F register (Dependant)
 	}
-	else
-	{
-		UnsetFlag(FLAG_ZERO);
-	}
 
 	SetFlag(FLAG_HALFCARRY);
 }
@@ -495,10 +475,6 @@ void GB::XOR(const ui8& value)
 	if (result == 0)
 	{
 		SetFlag(FLAG_ZERO);
-	}
-	else
-	{
-		UnsetFlag(FLAG_ZERO);
 	}
 }
 
@@ -518,7 +494,6 @@ void GB::RL(ui8& reg, bool A)
 {
 	//http://z80-heaven.wikidot.com/instructions-set:rl how RL works
 
-
 	ui8 carry = CheckFlag(FLAG_CARRY) ? 1 : 0;
 
 	ClearFlags();
@@ -529,6 +504,7 @@ void GB::RL(ui8& reg, bool A)
 	}
 
 	reg <<= 1;
+
 	reg |= carry;
 
 	if (!A) // If RL, N variant
@@ -536,10 +512,6 @@ void GB::RL(ui8& reg, bool A)
 		if (reg == 0) // Set if 0
 		{
 			SetFlag(FLAG_ZERO);
-		}
-		else
-		{
-			UnsetFlag(FLAG_ZERO);
 		}
 	}
 }
@@ -567,10 +539,6 @@ void GB::RLC(ui8& reg, bool A)
 		{
 			SetFlag(FLAG_ZERO);
 		}
-		else
-		{
-			UnsetFlag(FLAG_ZERO);
-		}
 	}
 }
 
@@ -593,16 +561,13 @@ void GB::RR(ui8& reg, bool A)
 		{
 			SetFlag(FLAG_ZERO);
 		}
-		else
-		{
-			UnsetFlag(FLAG_ZERO);
-		}
 	}
 }
 
 void GB::RRC(ui8& reg, bool A)
 {
 	ClearFlags();
+
 	if ((reg & 0x01) != 0)
 	{
 		SetFlag(FLAG_CARRY);
@@ -612,6 +577,15 @@ void GB::RRC(ui8& reg, bool A)
 	else
 	{
 		reg >>= 1;
+	}
+
+	if (!A)
+	{
+		if (reg == 0)
+		{
+			SetFlag(FLAG_ZERO);
+		}
+
 	}
 }
 
@@ -625,27 +599,15 @@ void GB::CP(const ui8& value)
 	{
 		SetFlag(FLAG_ZERO);
 	}
-	else
-	{
-		UnsetFlag(FLAG_ZERO);
-	}
 
 	if (((reg - value) & 15) > (reg & 15))
 	{
 		SetFlag(FLAG_HALFCARRY);
 	}
-	else
-	{
-		UnsetFlag(FLAG_HALFCARRY);
-	}
 
 	if (reg < value)
 	{
 		SetFlag(FLAG_CARRY);
-	}
-	else
-	{
-		UnsetFlag(FLAG_CARRY);
 	}
 }
 
@@ -665,27 +627,15 @@ void GB::SUB(const ui8& value)
 	{
 		SetFlag(FLAG_ZERO);
 	}
-	else
-	{
-		UnsetFlag(FLAG_ZERO);
-	}
 
 	if ((carrybits & 0x100) != 0)
 	{
 		SetFlag(FLAG_CARRY);
 	}
-	else
-	{
-		UnsetFlag(FLAG_CARRY);
-	}
 
 	if ((carrybits & 0x10) != 0)
 	{
 		SetFlag(FLAG_HALFCARRY);
-	}
-	else
-	{
-		UnsetFlag(FLAG_HALFCARRY);
 	}
 }
 
@@ -2460,7 +2410,7 @@ void GB::RenderBackground()
 	ui8 palette = ReadData(BACKGROUND_PALLETTE);
 	ui8& control = ReadData(lcdcRegister);
 	ui8& scrollY = ReadData(SCROLL_Y);
-	std::cout <<  (int)(scrollY) << std::endl;
+	std::cout << std::dec << (int)(scrollY) << std::endl;
 	if (scrollY == 64)
 	{
 		system("pause");

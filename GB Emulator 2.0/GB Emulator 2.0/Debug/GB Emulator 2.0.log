@@ -1,24 +1,9 @@
-﻿  Cartridge.cpp
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\Cartridge.cpp(14,24): warning C4244: 'initializing': conversion from 'std::streamoff' to 'unsigned int', possible loss of data
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\Cartridge.cpp(30,20): warning C4553: '==': result of expression not used; did you intend '='?
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\Cartridge.cpp(41,26): warning C4305: '=': truncation from 'int' to 'ui8'
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\Cartridge.cpp(41,23): warning C4309: '=': truncation of constant value
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\Cartridge.cpp(44,26): warning C4305: '=': truncation from 'int' to 'ui8'
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\Cartridge.cpp(44,23): warning C4309: '=': truncation of constant value
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\Cartridge.cpp(47,27): warning C4305: '=': truncation from 'int' to 'ui8'
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\Cartridge.cpp(47,23): warning C4309: '=': truncation of constant value
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\Cartridge.cpp(50,28): warning C4305: '=': truncation from 'int' to 'ui8'
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\Cartridge.cpp(50,23): warning C4309: '=': truncation of constant value
-  GB.cpp
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(860,48): warning C4305: 'argument': truncation from 'const int' to 'ui8'
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(860,33): warning C4309: 'argument': truncation of constant value
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(869,28): warning C4305: 'argument': truncation from 'const int' to 'ui8'
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(869,11): warning C4309: 'argument': truncation of constant value
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(877,30): warning C4305: 'argument': truncation from 'const int' to 'ui8'
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(877,13): warning C4309: 'argument': truncation of constant value
-  main.cpp
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\main.cpp(14,6): warning C4101: 'cycles': unreferenced local variable
-  Generating Code...
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(2380): warning C4715: 'GB::handleHBlankMode': not all control paths return a value
-  LINK : C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\Debug\GB Emulator 2.0.exe not found or not built by the last incremental link; performing full link
+﻿  GB.cpp
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(810,48): warning C4305: 'argument': truncation from 'const int' to 'ui8'
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(810,33): warning C4309: 'argument': truncation of constant value
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(819,28): warning C4305: 'argument': truncation from 'const int' to 'ui8'
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(819,11): warning C4309: 'argument': truncation of constant value
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(827,30): warning C4305: 'argument': truncation from 'const int' to 'ui8'
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(827,13): warning C4309: 'argument': truncation of constant value
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(2330): warning C4715: 'GB::handleHBlankMode': not all control paths return a value
   GB Emulator 2.0.vcxproj -> C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\Debug\GB Emulator 2.0.exe
