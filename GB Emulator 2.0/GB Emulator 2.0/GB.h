@@ -262,7 +262,8 @@ public:
     int clockFreq;
     unsigned int divCounter;
 
-    int TickCPU();
+    void NextFrame();
+    bool TickCPU();
     void TickClock();
     void ClockFrequency();
 
@@ -280,6 +281,7 @@ public:
     SDL_Texture* screen_texture;
 
     pixelRGB classicPallette[4] = { { 155,188,15 }, { 139,172,15 }, { 48,98,48 }, { 15,56,15 } };
+    pixelRGB greyPallette[4] = { { 255,255,255 },{ 0xCC,0xCC,0xCC },{ 0x77,0x77,0x77 }, { 0x0,0x0,0x0 } };
 
     static const unsigned int m_display_buffer_size = (160 * 144) * 4;
 
@@ -321,6 +323,8 @@ public:
     void UpdateLCDStatus();
     void CheckInterrupts();
     void CompareLYWithLYC();
+
+    bool DEBUGGING = false;
 
 
 //OP CODES

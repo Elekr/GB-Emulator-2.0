@@ -588,41 +588,55 @@ void GB::SUB(const ui8& value)
 	}
 }
 
-int GB::TickCPU()
+void GB::NextFrame()
 {
-	bool vSync = false;
+	while(!TickCPU());
+	cycles = 0;
+}
 
-	while (!vSync)
+bool GB::TickCPU()
+{
+	CheckInterrupts();
+	OPCode = ReadNextCode();
+
+	cycle = (normalCycles[OPCode] * 4);
+	cycles += cycle;
+
+	if (OPCode == 0xCB) // Extra Codes
 	{
 		OPCode = ReadNextCode();
 
-		cycle = (normalCycles[OPCode] * 4);
+		cycle = (CBCycles[OPCode] * 4);
 		cycles += cycle;
 
-		if (OPCode == 0xCB) // Extra Codes
+		(this->*CBCodes[OPCode])();
+		if (DEBUGGING)
 		{
-			OPCode = ReadNextCode();
-
-			cycle = (CBCycles[OPCode] * 4);
-			cycles += cycle;
-
-			(this->*CBCodes[OPCode])();
-			if (GetWordRegister(PC_REGISTER) > 0x54 && GetWordRegister(PC_REGISTER) < 0x95)
+			if (GetWordRegister(PC_REGISTER) > 0x6C && GetWordRegister(PC_REGISTER) < 0x95 /*&& ReadData(LYRegister) > 0x8e*/)
 			{
 				OUTPUTCBREGISTERS(OPCode);
 			}
 		}
-		else
+
+	}
+	else
+	{
+		(this->*BASECodes[OPCode])();
+		if (DEBUGGING)
 		{
-			(this->*BASECodes[OPCode])();
-			if (GetWordRegister(PC_REGISTER) > 0x54 && GetWordRegister(PC_REGISTER) < 0x95)
+			if (GetWordRegister(PC_REGISTER) > 0x6C && GetWordRegister(PC_REGISTER) < 0x95 /*&& ReadData(LYRegister) > 0x8e*/)
 			{
 				OUTPUTREGISTERS(OPCode);
 			}
 		}
-		vSync = updatePixels();
+
 	}
-	return 0;
+	TickClock();
+	bool vSync = updatePixels();
+
+
+
+	return vSync;
 }
 
 void GB::TickClock()
@@ -2129,9 +2143,10 @@ bool GB::updatePixels()
 	ui8& line = ReadData(LYRegister);
 
 	bool isDisplayEnabled = HasBit(controlBit, 7);
+
 	vBlank = false;
 
-	videoCycles += cycles; //update the cycles (time passed) from the CPU
+	videoCycles += cycle; //update the cycles (time passed) from the CPU
 
 	//if (lcdEnabled)
 	//{
@@ -2151,7 +2166,7 @@ bool GB::updatePixels()
 		{
 			if (line == 0x8f)
 			{
-				system("pause");
+				//std::cout << "hello" << std::endl;
 			}
 			handleHBlankMode(line);
 		}
@@ -2195,6 +2210,11 @@ bool GB::updatePixels()
 				}
 				CompareLYWithLYC();
 			}
+		}
+		else if (videoCycles >= 70224) //Fake vBlank
+		{
+			videoCycles -= 70224;
+			vBlank = true;
 		}
 	}
 	return vBlank;
@@ -2398,11 +2418,6 @@ bool GB::TickDisplay()
 								y_pos = scrollY + line;
 							else
 								y_pos = line - windowY;
-
-							if (scrollY == 28)
-							{
-								system("pause");
-							}
 
 							// which of the 8 vertical pixels of the current 
 							// tile is the scanline on?
@@ -2730,8 +2745,6 @@ void GB::handleHBlankMode(ui8& line)
 
 void GB::handleVBlankMode(ui8& line, int cycles)
 {
-	videoCycles += cycles;
-
 	if (videoCycles >= MAX_VIDEO_CYCLES)
 	{
 		videoCycles -= MAX_VIDEO_CYCLES;
@@ -2814,11 +2827,7 @@ void GB::RenderBackground()
 	bool unsig = HasBit(control, 4); //Which tile set to use 1 or 2 (whether the data is signed or unsigned)
 
 	//Debugging
-	std::cout << std::dec << (int)(scrollY) << std::endl;
-	//if (scrollY == 64)
-	//{
-	//	system("pause");
-	//}
+	/*std::cout << std::dec << (int)(scrollY) << std::endl;*/
 
 	//Fetching Data for tile sets
 	if (unsig)
@@ -2988,7 +2997,7 @@ void GB::RenderTile(bool unsig, ui16 tileMap, ui16 tileData, ui8 xPos, ui8 yPos,
 		tileLocation += ((currentTile + 128) * 16);
 	}
 	// find which vertical line we're on, each vertical line takes up two bytes of memory
-	ui8 vline = yPos % 8 * 2;
+	ui8 vline = (yPos % 8) * 2;
 	//Get the upper and lower bytes of tile data (1 bit from each combine to create the colour)
 	ui8 upper = ReadData(tileLocation + vline);
 	ui8 lower = ReadData(tileLocation + vline + 1);
@@ -3014,7 +3023,14 @@ void GB::RenderTile(bool unsig, ui16 tileMap, ui16 tileData, ui8 xPos, ui8 yPos,
 
 	int pixelIndex = pixel + (DISPLAY_WIDTH * line);
 	//Retrieve the colour values of the pixel from the pallette
-	pixelRGB colour = classicPallette[colourNum];
+	pixelRGB colour = classicPallette[(pallette >> colourNum * 2) & 3];
+
+
+
+	if (colourNum == LIGHT_GREY)
+	{
+		std::cout << "hello" << std::endl;
+	}
 
 	//Store them in the framebuffer
 	frameBuffer[pixelIndex * 4] = colour.blue;

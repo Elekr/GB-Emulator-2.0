@@ -15,8 +15,7 @@ int main(int argc, char* argv[])
 
 	while (windowOpen)
 	{
-		gameboy->TickCPU();
-		gameboy->TickClock();
+		gameboy->NextFrame();
 		gameboy->RenderGame();
 	}
 
