@@ -43,7 +43,7 @@ enum CPUInterupt
     JOYPAD = 0x04
 };
 
-const ui8 BIOS[256] = {  //NINTENDO BOOT ROM
+const ui8 BIOS[256] = {  //NINTENDO BOOT ROM https://realboyemulator.wordpress.com/2013/01/03/a-look-at-the-game-boy-bootstrap-let-the-fun-begin/
 
 	0x31, 0xfe, 0xff, 0xaf, 0x21, 0xff, 0x9f, 0x32, 0xcb, 0x7c, 0x20, 0xfb, 0x21, 0x26, 0xff, 0x0e,
 	0x11, 0x3e, 0x80, 0x32, 0xe2, 0x0c, 0x3e, 0xf3, 0xe2, 0x32, 0x3e, 0x77, 0x77, 0x3e, 0xfc, 0xe0,
@@ -223,8 +223,7 @@ public:
     inline void DECByteRegister(const ui8& reg);
 
     //**** FLAGS
-    void SetFlag(int flag);////////
-    void UnsetFlag(int flag);///////
+    void SetFlag(int flag, bool value);////////
     bool CheckFlag(int flag); ////////
     void ClearFlags(); ////////
 
@@ -282,14 +281,21 @@ public:
 
     pixelRGB classicPallette[4] = { { 155,188,15 }, { 139,172,15 }, { 48,98,48 }, { 15,56,15 } };
 
+    static const unsigned int m_display_buffer_size = (160 * 144) * 4;
+
     ui8 frameBuffer[DISPLAY_HEIGHT * DISPLAY_WIDTH * 4]; // viewport region into the frame buffer
+    ui8 backBuffer[DISPLAY_HEIGHT * DISPLAY_WIDTH * 4]; // viewport region into the frame buffer
 
     bool lcdEnabled = false;
+    bool vBlank = false;
     GPU_Mode currentMode;
-    int modeClock;
-    int videoCycles;
-    int vBlankCycles;
+    int modeClock = 0;
+    int videoCycles = 0;
+    int vBlankCycles = 0;
     int displayEnableDelay = 0;
+    int m_oam_pixel = 0;
+    int m_oam_tile = 0;
+
 
     bool createSDLWindow();
 
@@ -297,12 +303,14 @@ public:
     void EnableLCD();
 
     bool updatePixels();
+    bool TickDisplay();
     void drawScanline();
-    bool handleHBlankMode(ui8& line);
+    void handleHBlankMode(ui8& line);
     void handleVBlankMode(ui8& line, int cycles);
     void handleOAMMode();
     void handleLCDTransferMode();
     //**** Rendering http://www.codeslinger.co.uk/pages/projects/gameboy/graphics.html
+    //https://gbdev.io/pandocs/#video-display
     void RenderGame();
     void RenderBackground();
     void RenderWindow(ui8 windowY);

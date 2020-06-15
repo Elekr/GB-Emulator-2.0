@@ -17,6 +17,7 @@ bool GB::InitEMU(const char* path)
 	bool loaded = m_cartridge.Load(path);
 	if (!loaded)return false;
 
+	memcpy(m_bus, m_cartridge.GetRawData(), 0x8000);
 	return true;
 }
 
@@ -354,22 +355,9 @@ void GB::INCByteRegister(const ui8& reg) //Increments register and sets flags (Z
 
 	GetByteRegister(reg)++;
 
-	if (hasCarry == true)
-	{
-		SetFlag(FLAG_CARRY);
-	}
-
-	//UnsetFlag(FLAG_SUBTRACT); // Always reset
-
-	if (GetByteRegister(reg) == 0) // Set if 0
-	{
-		SetFlag(FLAG_ZERO);
-	}
-
-	if ((GetByteRegister(reg) & 0x0F) == 0x00) // Set if carry from bit 3
-	{
-		SetFlag(FLAG_HALFCARRY);
-	}
+	SetFlag(FLAG_CARRY, hasCarry);
+	SetFlag(FLAG_ZERO, (reg) == 0);
+	SetFlag(FLAG_HALFCARRY, (GetByteRegister(reg) & 0x0F) == 0x00);
 
 	//http://www.z80.info/z80syntx.htm#INC <- helpful information on INC
 	//https://stackoverflow.com/questions/8868396/gbz80-what-constitutes-a-half-carry HOW HALF CARRY WORKS
@@ -382,32 +370,28 @@ void GB::DECByteRegister(const ui8& reg)
 {
 	GetByteRegister(reg)--;
 
+
+
 	if (!CheckFlag(FLAG_CARRY))
 	{
 		ClearFlags();
 	}
 
-	if (GetByteRegister(reg) == 0) // Set if 0
-	{
-		SetFlag(FLAG_ZERO);
-	}
-
-	SetFlag(FLAG_SUBTRACT);
-
-	if ((GetByteRegister(reg) & 0x0F) == 0x0F) // Set if no borrow from bit 4
-	{
-		SetFlag(FLAG_HALFCARRY);
-	}
+	SetFlag(FLAG_ZERO, GetByteRegister(reg) == 0);
+	SetFlag(FLAG_SUBTRACT, true);
+	SetFlag(FLAG_HALFCARRY, (GetByteRegister(reg) & 0x0F) == 0x0F);
 }
 
-void GB::SetFlag(int flag)
+void GB::SetFlag(int flag, bool value)
 {
-	GetByteRegister(F_REGISTER) |= 1 << flag; // Use OR (|) on the flag bit ( 1|0 = 1)
-}
-
-void GB::UnsetFlag(int flag)
-{
-	GetByteRegister(F_REGISTER) &= ~(1 << flag); // Reverse the bits using NOT (~) then use AND (&)
+	if (value)
+	{
+		GetByteRegister(F_REGISTER) |= 1 << flag; // Use OR (|) on the flag bit ( 1|0 = 1)
+	}
+	else
+	{
+		GetByteRegister(F_REGISTER) &= ~(1 << flag); // Reverse the bits using NOT (~) then use AND (&)
+	}
 }
 
 bool GB::CheckFlag(int flag)
@@ -434,20 +418,17 @@ void GB::ADDHL(const ui16& reg)
 	bool hasZero = CheckFlag(FLAG_ZERO);
 
 	ClearFlags();
-
-	if (!hasZero) // Set if 0
-	{
-		SetFlag(FLAG_ZERO);
-	}
+	
+	SetFlag(FLAG_ZERO, hasZero);
 
 	if (result & 0x10000)
 	{
-		SetFlag(FLAG_CARRY);
+		SetFlag(FLAG_CARRY, true);
 	}
 
 	if ((GetWordRegister(HL_REGISTER) ^ reg ^ (result & 0xFFFF)) & 0x1000)
 	{
-		SetFlag(FLAG_HALFCARRY);
+		SetFlag(FLAG_HALFCARRY, true);
 	}
 
 	SetWordRegister(HL_REGISTER, static_cast<ui16>(result));
@@ -457,12 +438,8 @@ void GB::Bit(const ui8& value, ui8 bit)
 {
 	ClearFlags();
 	//CHECK IF BIT OF THE REGISTER HAS BEEN SET
-	if (((value >> bit) & 1) == 0) // If the zero flag has been set
-	{
-		SetFlag(FLAG_ZERO); // Set in the F register (Dependant)
-	}
-
-	SetFlag(FLAG_HALFCARRY);
+	SetFlag(FLAG_ZERO, ((value >> bit) & 0x01) == 0);
+	SetFlag(FLAG_HALFCARRY, true);
 }
 
 void GB::XOR(const ui8& value)
@@ -471,11 +448,7 @@ void GB::XOR(const ui8& value)
 	result ^= value;
 
 	ClearFlags();
-
-	if (result == 0)
-	{
-		SetFlag(FLAG_ZERO);
-	}
+	SetFlag(FLAG_ZERO, (result == 0));
 }
 
 void GB::LDI(const ui16 address, const ui8& reg)
@@ -500,7 +473,7 @@ void GB::RL(ui8& reg, bool A)
 
 	if ((reg & 0x80) != 0) //  If a Carry has happened
 	{
-		SetFlag(FLAG_CARRY);
+		SetFlag(FLAG_CARRY, true);
 	}
 
 	reg <<= 1;
@@ -508,11 +481,9 @@ void GB::RL(ui8& reg, bool A)
 	reg |= carry;
 
 	if (!A) // If RL, N variant
+
 	{
-		if (reg == 0) // Set if 0
-		{
-			SetFlag(FLAG_ZERO);
-		}
+		SetFlag(FLAG_ZERO, (reg == 0));
 	}
 }
 
@@ -524,7 +495,7 @@ void GB::RLC(ui8& reg, bool A)
 
 	if ((reg & 0x80) != 0) // if it isn't 0 must be 1 (so carry)
 	{
-		SetFlag(FLAG_CARRY);
+		SetFlag(FLAG_CARRY, true);
 		reg <<= 1;
 		reg |= 0x1;
 	}
@@ -535,10 +506,7 @@ void GB::RLC(ui8& reg, bool A)
 
 	if (!A)
 	{
-		if (GetByteRegister(reg) == 0) // Set if 0
-		{
-			SetFlag(FLAG_ZERO);
-		}
+		SetFlag(FLAG_ZERO, (reg == 0));
 	}
 }
 
@@ -549,7 +517,7 @@ void GB::RR(ui8& reg, bool A)
 	ClearFlags();
 	if ((reg & 0x01) != 0)
 	{
-		SetFlag(FLAG_CARRY);
+		SetFlag(FLAG_CARRY, true);
 	}
 
 	reg >>= 1;
@@ -557,10 +525,7 @@ void GB::RR(ui8& reg, bool A)
 
 	if (!A)
 	{
-		if (GetByteRegister(reg) == 0) // Set if 0
-		{
-			SetFlag(FLAG_ZERO);
-		}
+		SetFlag(FLAG_ZERO, (reg == 0));
 	}
 }
 
@@ -570,7 +535,7 @@ void GB::RRC(ui8& reg, bool A)
 
 	if ((reg & 0x01) != 0)
 	{
-		SetFlag(FLAG_CARRY);
+		SetFlag(FLAG_CARRY, true);
 		reg >>= 1;
 		reg |= 0x80;
 	}
@@ -581,11 +546,10 @@ void GB::RRC(ui8& reg, bool A)
 
 	if (!A)
 	{
-		if (reg == 0)
+		if (!A)
 		{
-			SetFlag(FLAG_ZERO);
+			SetFlag(FLAG_ZERO, (reg == 0));
 		}
-
 	}
 }
 
@@ -593,22 +557,11 @@ void GB::CP(const ui8& value)
 {
 	ui8& reg = GetByteRegister(A_REGISTER); //store the old A value (A Remains unchanged)
 
-	SetFlag(FLAG_SUBTRACT);
+	SetFlag(FLAG_SUBTRACT, true);
 
-	if (reg == value)
-	{
-		SetFlag(FLAG_ZERO);
-	}
-
-	if (((reg - value) & 15) > (reg & 15))
-	{
-		SetFlag(FLAG_HALFCARRY);
-	}
-
-	if (reg < value)
-	{
-		SetFlag(FLAG_CARRY);
-	}
+	SetFlag(FLAG_CARRY, reg < value);
+	SetFlag(FLAG_ZERO, reg == value);
+	SetFlag(FLAG_HALFCARRY, ((reg - value) & 0xF) > (reg & 0xF));
 }
 
 void GB::SUB(const ui8& value)
@@ -621,21 +574,17 @@ void GB::SUB(const ui8& value)
 
 	ClearFlags();
 
-	SetFlag(FLAG_SUBTRACT);
+	SetFlag(FLAG_SUBTRACT, true);
 
-	if (static_cast<ui8>(result) == 0)
-	{
-		SetFlag(FLAG_ZERO);
-	}
+	SetFlag(FLAG_ZERO, static_cast<ui8>(result) == 0);
 
 	if ((carrybits & 0x100) != 0)
 	{
-		SetFlag(FLAG_CARRY);
+		SetFlag(FLAG_CARRY, true);
 	}
-
 	if ((carrybits & 0x10) != 0)
 	{
-		SetFlag(FLAG_HALFCARRY);
+		SetFlag(FLAG_HALFCARRY, true);
 	}
 }
 
@@ -658,7 +607,7 @@ int GB::TickCPU()
 			cycles += cycle;
 
 			(this->*CBCodes[OPCode])();
-			if (GetWordRegister(PC_REGISTER) >= 0x6C && GetWordRegister(PC_REGISTER) < 0x95)
+			if (GetWordRegister(PC_REGISTER) > 0x54 && GetWordRegister(PC_REGISTER) < 0x95)
 			{
 				OUTPUTCBREGISTERS(OPCode);
 			}
@@ -666,7 +615,7 @@ int GB::TickCPU()
 		else
 		{
 			(this->*BASECodes[OPCode])();
-			if (GetWordRegister(PC_REGISTER) >= 0x6C && GetWordRegister(PC_REGISTER) < 0x95)
+			if (GetWordRegister(PC_REGISTER) > 0x54 && GetWordRegister(PC_REGISTER) < 0x95)
 			{
 				OUTPUTREGISTERS(OPCode);
 			}
@@ -918,8 +867,8 @@ void GB::OP2F()
 {
 	SetByteRegister(A_REGISTER, ~GetByteRegister(A_REGISTER)); // Flips the bits of the register
 
-	SetFlag(FLAG_HALFCARRY);
-	SetFlag(FLAG_SUBTRACT);
+	SetFlag(FLAG_HALFCARRY, true);
+	SetFlag(FLAG_SUBTRACT, true);
 }; // CPL	http://www.cplusplus.com/doc/tutorial/operators/
 void GB::OP30() 
 {
@@ -954,9 +903,9 @@ void GB::OP35()
 void GB::OP36() { WriteData(GetWordRegister(HL_REGISTER), ReadByte()); }; // LD (HL) ui8
 void GB::OP37() 
 {
-	SetFlag(FLAG_CARRY);
-	UnsetFlag(FLAG_HALFCARRY);
-	UnsetFlag(FLAG_SUBTRACT);
+	SetFlag(FLAG_CARRY, true);
+	SetFlag(FLAG_HALFCARRY, false);
+	SetFlag(FLAG_SUBTRACT, false);
 }; // SCF http://z80-heaven.wikidot.com/instructions-set:scf
 void GB::OP38() 
 {
@@ -981,19 +930,10 @@ void GB::OP3D() { DECByteRegister(A_REGISTER); }; // DEC A
 void GB::OP3E() { SetByteRegister(A_REGISTER, ReadByte()); }; // LD A, ui8
 void GB::OP3F() 
 {
-	bool flag = CheckFlag(FLAG_CARRY);
+	SetFlag(FLAG_CARRY, !CheckFlag(FLAG_CARRY));
+	SetFlag(FLAG_HALFCARRY, false);
+	SetFlag(FLAG_SUBTRACT, false);
 
-	if (flag)
-	{
-		UnsetFlag(FLAG_CARRY);
-	}
-	else
-	{
-		SetFlag(FLAG_CARRY);
-	}
-
-	UnsetFlag(FLAG_HALFCARRY);
-	UnsetFlag(FLAG_SUBTRACT);
 }; // CCF http://z80-heaven.wikidot.com/instructions-set:ccf
 void GB::OP40() { SetByteRegister(B_REGISTER, GetByteRegister(B_REGISTER)); }; // LD B, B
 void GB::OP41() { SetByteRegister(B_REGISTER, GetByteRegister(C_REGISTER)); }; // LD B, C
@@ -2189,7 +2129,7 @@ bool GB::updatePixels()
 	ui8& line = ReadData(LYRegister);
 
 	bool isDisplayEnabled = HasBit(controlBit, 7);
-	bool vBlank = false;
+	vBlank = false;
 
 	videoCycles += cycles; //update the cycles (time passed) from the CPU
 
@@ -2204,24 +2144,29 @@ bool GB::updatePixels()
 
 	if (isDisplayEnabled && lcdEnabled)
 	{
+
 		switch (currentMode)
 		{
-		case H_BLANK:
+		case 0:
 		{
-			vBlank = handleHBlankMode(line);
+			if (line == 0x8f)
+			{
+				system("pause");
+			}
+			handleHBlankMode(line);
 		}
 		break;
-		case V_BLANK:
+		case 1: 
 		{
 			handleVBlankMode(line, cycles);
 		}
 		break;
-		case OAM:
+		case 2:
 		{
 			handleOAMMode();
 		}
 		break;
-		case LCD_TRANSFER:
+		case 3:
 		{
 			handleLCDTransferMode();
 		}
@@ -2255,6 +2200,461 @@ bool GB::updatePixels()
 	return vBlank;
 }
 
+bool GB::TickDisplay()
+{
+	// Display Status
+	ui8& controll_bit = ReadData(lcdcRegister);
+	bool isDisplayEnabled = HasBit(controll_bit, 7);
+
+	ui8& status = ReadData(statusRegister);
+	ui8& line = ReadData(LYRegister);
+
+	bool vBlank = false;
+
+	videoCycles += cycles;
+
+	if (isDisplayEnabled && lcdEnabled)
+	{
+		// Src http://gbdev.gg8.se/wiki/articles/Video_Display#INT_40_-_V-Blank_Interrupt
+		// Mode 2  2_____2_____2_____2_____2_____2___________________2____ Scanning OAM
+		// Mode 3  _33____33____33____33____33____33__________________3___ Reading OAM
+		// Mode 0  ___000___000___000___000___000___000________________000 Horizontal Blank
+		// Mode 1  ____________________________________11111111111111_____ Vertical Blank
+
+		// Mode 0 :  Cycles
+		// Mode 1 : 4560 Cycles
+		// Mode 2 : 80 Cycles
+		// Mode 3 :  Cycles
+
+		// Whole frame is 154 scan lines
+		switch (currentMode)
+		{
+		case 0: // Horizontal Blank
+		{
+			if (videoCycles >= 204)
+			{
+				// Time of mode 0 has elapsed
+				videoCycles -= 204;
+				// Switch to OAM Scan
+				currentMode = OAM;
+
+				// Increment scan line
+				line++;
+
+				// Compare LY to LYC and if they match, interupt
+				CompareLYWithLYC();
+
+				if (line == 144) // Are we in VBlank
+				{
+					// Switch to VBLank
+					currentMode = V_BLANK;
+
+					RequestInterupt(VBLANK);
+
+					// Transfer screen data to front buffer
+					{
+						memcpy(frameBuffer, backBuffer, m_display_buffer_size);
+
+						// Reset back buffer
+						for (int i = 0; i < m_display_buffer_size; i++)
+						{
+							if (i % 4 == 3)
+							{
+								backBuffer[i] = 255;
+							}
+							else
+							{
+								backBuffer[i] = 0;
+							}
+						}
+					}
+
+					// Should we V-Blank Interupt
+					if (HasBit(status, 4))
+					{
+						RequestInterupt(LCD);
+					}
+					vBlank = true;
+				}
+				else
+				{
+					// Should we H-Blank Interupt
+					if (HasBit(status, 5))
+					{
+						RequestInterupt(LCD);
+					}
+				}
+				UpdateLCDStatus();
+			}
+
+			break;
+		}
+		case 1: // Vertical Blank
+		{
+			// Have we reached a VBlank line?
+			if (videoCycles >= 456)
+			{
+				videoCycles -= 456;
+				line++;
+				CompareLYWithLYC();
+			}
+			// Have we reached the 10th VBlank line?
+			if (line > 153)
+			{
+				line = 0;
+				currentMode = OAM;
+				UpdateLCDStatus();
+				if (HasBit(status, 5))
+				{
+					RequestInterupt(LCD);
+				}
+			}
+			break;
+		}
+		case 2: // Scanning OAM
+		{
+			if (videoCycles >= 80)
+			{
+				videoCycles -= 80;
+				currentMode = LCD_TRANSFER;
+				UpdateLCDStatus();
+			}
+
+			break;
+		}
+		case 3: // Reading OAM
+		{
+
+
+			if (m_oam_pixel < 160)
+			{
+				m_oam_tile += cycle;
+
+
+				if (HasBit(controll_bit, 7)) // Is the screen on
+				{
+					// Render the background
+
+
+					while (m_oam_tile >= 3)
+					{
+
+						if (HasBit(controll_bit, 0)) // BG Display enabled
+						{
+
+							ui16 tile_data = 0;
+							ui16 background_memory = 0;
+							// Is the memory location we are accessing signed?
+							bool unsig = true;
+							ui8 scrollY = ReadData(0xFF42);
+							ui8 scrollX = ReadData(0xFF43);
+							ui8 windowY = ReadData(0xFF4A);
+							ui8& win = ReadData(0xFF4B);
+							ui8 windowX = ReadData(0xFF4B) - 7;
+
+
+							bool using_window = false;
+
+							// Is the window enabled
+							if (HasBit(controll_bit, 5))
+							{
+								// Is the scan-line inside the window
+								if (windowY <= line)
+									using_window = true;
+							}
+
+							// which tile data are we using? 
+							if (HasBit(controll_bit, 4))
+							{
+								tile_data = 0x8000;
+							}
+							else
+							{
+								tile_data = 0x8800;
+								unsig = false;
+							}
+
+							// Are we drawing a window or a normal background
+							if (!using_window)
+							{
+								if (HasBit(controll_bit, 3))
+									background_memory = 0x9C00;
+								else
+									background_memory = 0x9800;
+							}
+							else
+							{
+								// Which window memory
+								if (HasBit(controll_bit, 6))
+									background_memory = 0x9C00;
+								else
+									background_memory = 0x9800;
+							}
+
+							// y_pos tells us which one of the 32 tiles the scan-line is currently drawing
+							ui8 y_pos = 0;
+
+							if (!using_window)
+								y_pos = scrollY + line;
+							else
+								y_pos = line - windowY;
+
+							if (scrollY == 28)
+							{
+								system("pause");
+							}
+
+							// which of the 8 vertical pixels of the current 
+							// tile is the scanline on?
+							ui16 tile_row = (((ui8)(y_pos / 8)) * 32);
+
+							// time to start drawing the 160 horizontal pixels
+							// for this scanline
+
+							ui8 palette = ReadData(BACKGROUND_PALLETTE);
+
+							for (int pixel = m_oam_pixel; pixel < m_oam_pixel + 4; pixel++)
+							{
+								ui8 x_pos = pixel + scrollX;
+
+								// translate the current x pos to window space if necessary
+								if (using_window)
+								{
+									//if (pixel >= windowX)
+									{
+										x_pos = pixel - windowX;
+									}
+								}
+
+								// Out of the 32 horizontal tiles, what one are we currently on
+								ui8 tile_col = (x_pos / 8);
+								i16 tile_num;
+
+								// get the tile identity number. This can be signed as well as unsigned
+								ui16 tileAddrss = background_memory + tile_row + tile_col;
+								if (unsig)
+									tile_num = (ui8)ReadData(tileAddrss);
+								else
+									tile_num = (i8)ReadData(tileAddrss);
+
+								// Is this tile identifier is in memory.
+								ui16 tile_location = tile_data;
+
+								if (unsig)
+									tile_location += (tile_num * 16);
+								else
+									tile_location += ((tile_num + 128) * 16);
+
+
+								// find the correct vertical line we're on of the 
+								// tile to get the tile data 
+								//from in memory
+								ui8 vline = y_pos % 8;
+								vline *= 2; // each vertical line takes up two bytes of memory
+								ui8 data1 = ReadData(tile_location + vline);
+								ui8 data2 = ReadData(tile_location + vline + 1);
+
+								// pixel 0 in the tile is it 7 of data 1 and data2.
+								// Pixel 1 is bit 6 etc..
+								int colour_bit = x_pos % 8;
+								colour_bit -= 7;
+								colour_bit *= -1;
+
+
+
+
+
+								// combine data 2 and data 1 to get the colour id for this pixel 
+								// in the tile
+
+
+								int colourNum = (ui8)(data2 >> colour_bit) & 1; // Get the set bit
+								colourNum <<= 1;
+								colourNum |= (ui8)(data1 >> colour_bit) & 1; // Get the set bit
+
+
+
+								ui8 color = (palette >> (colourNum * 2)) & 0x03;
+
+
+
+								int pixel_index = pixel + 160 * line;
+								pixel_index *= 4;
+								backBuffer[pixel_index] = backBuffer[pixel_index + 1] = backBuffer[pixel_index + 2] = (3 - color) * 64;
+
+
+								// Test - Output the tile ID to see if any tile data is being written to the screen
+								//backBuffer[pixel_index] = backBuffer[pixel_index + 1] = backBuffer[pixel_index + 2] = tile_num;
+							}
+
+						}
+
+
+
+						m_oam_pixel += 4;
+						m_oam_tile -= 3;
+						if (m_oam_pixel >= 160)
+						{
+							break;
+						}
+					}
+
+				}
+
+			}
+
+			// Help from http://www.codeslinger.co.uk/pages/projects/gameboy/graphics.html
+			// and 
+			if (HasBit(controll_bit, 1)) // Is Sprites Enabled
+			{
+				int sprite_height = HasBit(controll_bit, 2) ? 16 : 8;
+				int line_width = (line * 160); // Gameboy width
+
+
+				for (int sprite = 0; sprite < 40; sprite++)
+				{
+					// A sprite takes up 4 bytes in the sprite table
+					ui8 index = sprite * 4;
+					int yPos = ReadData(0xFE00 + index) - 16;
+
+					if ((yPos > line) || ((yPos + sprite_height) <= line))
+						continue;
+
+					int xPos = ReadData(0xFE00 + index + 1) - 8;
+
+
+					if ((xPos < -7) || (xPos >= 160)) // 160 Gameboy width
+						continue;
+
+					ui8 tileLocation = ReadData(0xFE00 + index + 2);
+					ui8 attributes = ReadData(0xFE00 + index + 3);
+
+
+					bool yFlip = HasBit(attributes, 6);
+					bool xFlip = HasBit(attributes, 5);
+
+
+					if ((line >= yPos) && (line < (yPos + sprite_height)))
+					{
+						int spriteLine = line - yPos;
+
+
+						if (yFlip)
+						{
+							spriteLine -= sprite_height;
+							spriteLine *= -1;
+						}
+						spriteLine *= 2; // same as for tiles
+
+						ui16 dataAddress = (0x8000 + (tileLocation * 16)) + spriteLine;
+						ui8 data1 = ReadData(dataAddress);
+						ui8 data2 = ReadData(dataAddress + 1);
+
+
+						for (int tilePixel = 7; tilePixel >= 0; tilePixel--)
+						{
+							int colorX = tilePixel;
+							// read the sprite in backwards for the x axis 
+							if (xFlip)
+							{
+								colorX -= 7;
+								colorX *= -1;
+							}
+
+
+							// the rest is the same as for tiles
+							int colourNum = (ui8)(data2 >> colorX) & 1; // Get the set bit
+							colourNum <<= 1;
+							colourNum |= (ui8)(data1 >> colorX) & 1; // Get the set bit
+
+							if (colourNum == 0)
+								continue;
+
+
+
+							ui16 colourAddress = HasBit(attributes, 4) ? 0xFF49 : 0xFF48;
+
+							ui8 palette = ReadData(colourAddress);
+
+							ui8 color = (palette >> (colourNum * 2)) & 0x03;
+
+							int xPix = 0 - tilePixel;
+							xPix += 7;
+
+							int pixel = xPos + xPix;
+
+							int pixel_index = pixel + 160 * line;
+							pixel_index *= 4;
+							backBuffer[pixel_index] = backBuffer[pixel_index + 1] = backBuffer[pixel_index + 2] = (3 - color) * 64;
+						}
+
+
+					}
+
+
+
+
+				}
+
+			}
+
+
+			if (videoCycles >= 172)
+			{
+				videoCycles -= 172;
+				currentMode = H_BLANK;
+				m_oam_pixel = 0;
+				m_oam_tile = 0;
+				UpdateLCDStatus();
+				if (HasBit(status, 3))
+				{
+					RequestInterupt(LCD);
+				}
+			}
+
+
+
+
+
+
+			break;
+		}
+		}
+	}
+	else // Screen dissabled
+	{
+		if (displayEnableDelay > 0)
+		{
+			displayEnableDelay -= cycle;
+
+			if (displayEnableDelay <= 0)
+			{
+				lcdEnabled = true;
+				displayEnableDelay = 0;
+				videoCycles = 0;
+				ReadData(LYRegister) = 0;
+
+				currentMode = H_BLANK;
+				UpdateLCDStatus();
+
+				if (HasBit(status, 5))
+				{
+					RequestInterupt(LCD);
+				}
+				CompareLYWithLYC();
+			}
+		}
+		else
+			// Fake that we have done a vblank when with the screen off
+			if (videoCycles >= 70224)
+			{
+				videoCycles -= 70224;
+				vBlank = true;
+			}
+	}
+	return vBlank;
+}
+
 void GB::drawScanline()
 {
 	ui8& line = ReadData(LYRegister);
@@ -2283,9 +2683,8 @@ void GB::drawScanline()
 	}
 }
 
-bool GB::handleHBlankMode(ui8& line)
+void GB::handleHBlankMode(ui8& line)
 {
-
 	if (videoCycles >= MIN_HBLANK_MODE_CYCLES)
 	{
 		videoCycles -= MIN_HBLANK_MODE_CYCLES;
@@ -2314,7 +2713,7 @@ bool GB::handleHBlankMode(ui8& line)
 				RequestInterupt(LCD);
 			}
 
-			return true;
+			vBlank = true;
 		}
 		else
 		{
@@ -2410,15 +2809,16 @@ void GB::RenderBackground()
 	ui8 palette = ReadData(BACKGROUND_PALLETTE);
 	ui8& control = ReadData(lcdcRegister);
 	ui8& scrollY = ReadData(SCROLL_Y);
-	std::cout << std::dec << (int)(scrollY) << std::endl;
-	if (scrollY == 64)
-	{
-		system("pause");
-	}
 	ui8& scrollX = ReadData(SCROLL_X);
 	ui8& line = ReadData(LYRegister);
 	bool unsig = HasBit(control, 4); //Which tile set to use 1 or 2 (whether the data is signed or unsigned)
 
+	//Debugging
+	std::cout << std::dec << (int)(scrollY) << std::endl;
+	//if (scrollY == 64)
+	//{
+	//	system("pause");
+	//}
 
 	//Fetching Data for tile sets
 	if (unsig)
@@ -2569,14 +2969,14 @@ void GB::RenderTile(bool unsig, ui16 tileMap, ui16 tileData, ui8 xPos, ui8 yPos,
 {
 	ui8& line = ReadData(LYRegister);
 	// which of the 8 vertical pixels of the current tile is the scanline on?
-	ui16 tileRow = (((yPos / 8)) * 32);
+	ui16 tileRow = (((ui8)(yPos / 8)) * 32);
 	// Out of the 32 horizontal tiles, what one are we currently on
 	ui8 tileColumn = (xPos / 8);
 	//Get the address for the tileData
 	ui16 tileAddress = tileData + tileRow + tileColumn;
 	ui16 tileLocation = tileData;
 	i16 currentTile;
-	//
+
 	if (unsig)
 	{
 		currentTile = (ui8)ReadData(tileAddress);
@@ -2598,9 +2998,9 @@ void GB::RenderTile(bool unsig, ui16 tileMap, ui16 tileData, ui8 xPos, ui8 yPos,
 	colourBit = -colourBit;
 
 	//Combining the tile data together to create the value for the pixel colour
-	int colourNum = (lower >> colourBit) & 1; // Get the set bit
+	int colourNum = (ui8)(lower >> colourBit) & 1; // Get the set bit
 	colourNum <<= 1;
-	colourNum |= (upper >> colourBit) & 1;
+	colourNum |= (ui8)(upper >> colourBit) & 1;
 	//Visual representation below
 
 	//A            7 6 5 4 3 2 1 0
@@ -2615,6 +3015,7 @@ void GB::RenderTile(bool unsig, ui16 tileMap, ui16 tileData, ui8 xPos, ui8 yPos,
 	int pixelIndex = pixel + (DISPLAY_WIDTH * line);
 	//Retrieve the colour values of the pixel from the pallette
 	pixelRGB colour = classicPallette[colourNum];
+
 	//Store them in the framebuffer
 	frameBuffer[pixelIndex * 4] = colour.blue;
 	frameBuffer[pixelIndex * 4 + 1] = colour.green;
