@@ -1,0 +1,12 @@
+﻿GB.obj : error LNK2019: unresolved external symbol SDL_CreateWindow referenced in function "public: bool __cdecl GB::createSDLWindow(void)" (?createSDLWindow@GB@@QEAA_NXZ)
+GB.obj : error LNK2019: unresolved external symbol SDL_CreateRenderer referenced in function "public: bool __cdecl GB::createSDLWindow(void)" (?createSDLWindow@GB@@QEAA_NXZ)
+GB.obj : error LNK2019: unresolved external symbol SDL_CreateTexture referenced in function "public: bool __cdecl GB::createSDLWindow(void)" (?createSDLWindow@GB@@QEAA_NXZ)
+GB.obj : error LNK2019: unresolved external symbol SDL_LockTexture referenced in function "public: void __cdecl GB::RenderGame(void)" (?RenderGame@GB@@QEAAXXZ)
+GB.obj : error LNK2019: unresolved external symbol SDL_UnlockTexture referenced in function "public: void __cdecl GB::RenderGame(void)" (?RenderGame@GB@@QEAAXXZ)
+GB.obj : error LNK2019: unresolved external symbol SDL_RenderCopy referenced in function "public: void __cdecl GB::RenderGame(void)" (?RenderGame@GB@@QEAAXXZ)
+GB.obj : error LNK2019: unresolved external symbol SDL_RenderPresent referenced in function "public: void __cdecl GB::RenderGame(void)" (?RenderGame@GB@@QEAAXXZ)
+GB.obj : error LNK2019: unresolved external symbol SDL_Init referenced in function "public: bool __cdecl GB::createSDLWindow(void)" (?createSDLWindow@GB@@QEAA_NXZ)
+MSVCRTD.lib(exe_main.obj) : error LNK2019: unresolved external symbol main referenced in function "int __cdecl invoke_main(void)" (?invoke_main@@YAHXZ)
+C:\Users\Tom\Documents\Dev\SDL2\lib\x86\SDL2.lib : warning LNK4272: library machine type 'x86' conflicts with target machine type 'x64'
+C:\Users\Tom\Documents\Dev\SDL2\lib\x86\SDL2main.lib : warning LNK4272: library machine type 'x86' conflicts with target machine type 'x64'
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\x64\Debug\GB Emulator 2.0.exe : fatal error LNK1120: 9 unresolved externals
