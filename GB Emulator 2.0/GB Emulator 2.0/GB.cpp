@@ -9,14 +9,13 @@ GB::GB()
 	InitCBOPArray();
 
 	//Reset function
-	SetPC(0x00);
+	Reset();
 }
 
 bool GB::InitEMU(const char* path)
 {
 	bool loaded = m_cartridge.Load(path);
 	if (!loaded)return false;
-
 	memcpy(m_bus, m_cartridge.GetRawData(), 0x8000);
 	return true;
 }
@@ -33,25 +32,46 @@ void GB::addBIOS()
 
 void GB::Reset()
 {
-	// Reset registers
 	SetWordRegister(SP_REGISTER, 0x0000);
-	SetWordRegister(PC_REGISTER, 0x0000);
+	SetPC(0x0000);
+
 	SetWordRegister(AF_REGISTER, 0x0000);
 	SetWordRegister(BC_REGISTER, 0x0000);
 	SetWordRegister(DE_REGISTER, 0x0000);
 	SetWordRegister(HL_REGISTER, 0x0000);
 
 
-	for (unsigned int i = 0; i < 0xFFFF; ++i)
+
+	for (unsigned int i = 0; i < m_display_buffer_size; i++)
+	{
+		frameBuffer[i] = 0x0;
+	}
+
+	for (int i = 0; i < BIOS_SIZE; i++)
+	{
+		m_bus[i] = BIOS[i];
+	}
+
+	for (int i = 0x9800; i < 0x9800 + 0x400; i++)
 	{
 		m_bus[i] = 0x0;
 	}
 
-	// Laod memory bank 0 into memory
-	memcpy(m_bus, m_cartridge.GetRawData(), 0x4000);
+	ReadData(LYRegister) = 144;
 
-	// Reset BIOS
-	memcpy(m_bus, BIOS, 256);
+	interruptsEnabled = false;
+	ReadData(m_cpu_interupt_flag_address) = 0x0;
+
+	// Reset the joypad
+	joypadActual = 0xFF;
+	m_joypadCycles = 0;
+
+	// Reset display
+	ReadData(LYRegister) = 144; // Set scanline to 144
+	videoCycles = 0;
+	currentMode = V_BLANK;
+
+	//InitClockFrequency();
 }
 
 void GB::WriteData(ui16 address, ui8 data)
@@ -135,9 +155,7 @@ void GB::WriteData(ui16 address, ui8 data)
 				else
 				{
 					std::cout << "Booted Successfully" << std::endl;
-					std::cout << GetWordRegister(PC_REGISTER) << std::endl;
 					//DEBUGGING = true;
-					//TODO: Overwrite the bootrom with the game
 
 					ui8* cartridgeMemory = m_cartridge.GetRawData();
 					for (int i = 0; i < BIOS_SIZE; i++)
@@ -146,7 +164,6 @@ void GB::WriteData(ui16 address, ui8 data)
 					}
 
 				}
-			m_bus[address] = data;
 			m_bus[address] = data;
 			break;
 		}
@@ -432,6 +449,11 @@ void GB::Jr()
 	SetPC(newPC);
 }
 
+void GB::Jr(const ui8& address)
+{
+	SetPC(address);
+}
+
 void GB::ADDHL(const ui16& reg)
 {
 	int result = GetWordRegister(HL_REGISTER) + reg;
@@ -683,6 +705,20 @@ void GB::AND(const ui8& value)
 	SetFlag(FLAG_HALFCARRY, true);
 }
 
+void GB::Swap(ui8& value)
+{
+	ui8 low_half = value & 0x0F;
+	ui8 high_half = (value >> 4) & 0x0F;
+
+	value = (low_half << 4) + high_half;
+
+
+	SetFlag(FLAG_ZERO, value == 0);
+	SetFlag(FLAG_CARRY, false);
+	SetFlag(FLAG_HALFCARRY, false);
+	SetFlag(FLAG_SUBTRACT, false);
+}
+
 void GB::NextFrame()
 {
 	while(!TickCPU());
@@ -693,6 +729,10 @@ void GB::NextFrame()
 bool GB::TickCPU()
 {
 	CheckInterrupts();
+	if (GetWordRegister(PC_REGISTER) == 0x150)
+	{
+		std::cout << "yeet" << std::endl;
+	}
 	OPCode = ReadNextCode();
 
 	cycle = (normalCycles[OPCode] * 4);
@@ -708,7 +748,7 @@ bool GB::TickCPU()
 		(this->*CBCodes[OPCode])();
 		if (DEBUGGING)
 		{
-			if (GetWordRegister(PC_REGISTER) > 0xE0 /*&& GetWordRegister(PC_REGISTER) < 0x95*/ /*&& ReadData(LYRegister) > 0x8e*/)
+			if (GetWordRegister(PC_REGISTER) >= 0x270 /*&& GetWordRegister(PC_REGISTER) < 0x95*/ /*&& ReadData(LYRegister) > 0x8e*/)
 			{
 				OUTPUTCBREGISTERS(OPCode);
 			}
@@ -720,7 +760,7 @@ bool GB::TickCPU()
 		(this->*BASECodes[OPCode])();
 		if (DEBUGGING)
 		{
-			if (GetWordRegister(PC_REGISTER) > 0xE0 /*&& GetWordRegister(PC_REGISTER) < 0x95*/ /*&& ReadData(LYRegister) > 0x8e*/)
+			if (GetWordRegister(PC_REGISTER) >= 0x270 /*&& GetWordRegister(PC_REGISTER) < 0x95*/ /*&& ReadData(LYRegister) > 0x8e*/)
 			{
 				OUTPUTREGISTERS(OPCode);
 			}
@@ -1131,10 +1171,10 @@ void GB::OP74() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(H_REGI
 void GB::OP75() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(L_REGISTER)); }; // LD (HL), L
 void GB::OP76() {assert("Missing" && 0);}; // HALT
 void GB::OP77() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(A_REGISTER)); }; // LD (HL), A
-void GB::OP78() {SetByteRegister(A_REGISTER, GetByteRegister(B_REGISTER));}; // LD A, B
-void GB::OP79() {assert("Missing" && 0);};
-void GB::OP7A() {assert("Missing" && 0);};
-void GB::OP7B() { SetByteRegister(A_REGISTER, GetByteRegister(E_REGISTER)); };
+void GB::OP78() { SetByteRegister(A_REGISTER, GetByteRegister(B_REGISTER));}; // LD A, B
+void GB::OP79() { SetByteRegister(A_REGISTER, GetByteRegister(C_REGISTER));}; // LD A, C
+void GB::OP7A() { SetByteRegister(A_REGISTER, GetByteRegister(D_REGISTER));}; // LD A, D
+void GB::OP7B() { SetByteRegister(A_REGISTER, GetByteRegister(E_REGISTER)); }; // LD A, E
 void GB::OP7C() { SetByteRegister(A_REGISTER, GetByteRegister(H_REGISTER)); }; // LD A, H
 void GB::OP7D() { SetByteRegister(A_REGISTER, GetByteRegister(L_REGISTER)); }; // A, L
 void GB::OP7E() { SetByteRegister(A_REGISTER, ReadData(GetWordRegister(HL_REGISTER))); }; // LD A, (HL)
@@ -1203,7 +1243,13 @@ void GB::OPBC() { CP(GetByteRegister(H_REGISTER)); }; // CP A, H
 void GB::OPBD() { CP(GetByteRegister(L_REGISTER)); }; // CP A, L
 void GB::OPBE() { CP(ReadData(GetWordRegister(HL_REGISTER))); }; // CP A, (HL)
 void GB::OPBF() { CP(GetByteRegister(A_REGISTER)); }; // CP A, A
-void GB::OPC0() {assert("Missing" && 0);};
+void GB::OPC0() 
+{
+	if (!CheckFlag(FLAG_ZERO))
+	{
+		PopStackPC();
+	}
+}; // RET NZ
 void GB::OPC1() { PopStack(BC_REGISTER); }; // POP BC
 void GB::OPC2() {assert("Missing" && 0);};
 void GB::OPC3() { SetPC(ReadWord()); }; //JP u16
@@ -1211,9 +1257,22 @@ void GB::OPC4() {assert("Missing" && 0);};
 void GB::OPC5() { PushStack(BC_REGISTER); }; // PUSH BC
 void GB::OPC6() {assert("Missing" && 0);};
 void GB::OPC7() {assert("Missing" && 0);};
-void GB::OPC8() {assert("Missing" && 0);};
+void GB::OPC8() 
+{
+	if (CheckFlag(FLAG_ZERO))
+	{
+		PopStackPC();
+	}
+}; // RET Z
 void GB::OPC9() { PopStackPC(); }; // RET
-void GB::OPCA() {assert("Missing" && 0);};
+void GB::OPCA() 
+{
+	ui16 address = ReadWord();
+	if (CheckFlag(FLAG_ZERO))
+	{
+		Jr(address);
+	}
+}; // JP Z, u16
 void GB::OPCB() {assert("Missing" && 0);};
 void GB::OPCC() 
 {
@@ -1297,9 +1356,17 @@ void GB::OPEB() {assert("Invalid CPU Instruction" && 0);};
 void GB::OPEC() {assert("Invalid CPU Instruction" && 0);};
 void GB::OPED() {assert("Invalid CPU Instruction" && 0);};
 void GB::OPEE() {assert("Missing" && 0);};
-void GB::OPEF() {assert("Missing" && 0);};
+void GB::OPEF() 
+{
+	PushStack(PC_REGISTER);
+	SetPC(RESET_28);
+};
 void GB::OPF0() { SetByteRegister(A_REGISTER, ReadData(static_cast<ui16> (0xFF00 + ReadByte()))); }; // LD A, (FF00+u8)
-void GB::OPF1() {assert("Missing" && 0);};
+void GB::OPF1() 
+{
+	PopStack(AF_REGISTER);
+	GetByteRegister(F_REGISTER) &= 0xF0;
+}; // POP AF
 void GB::OPF2() {assert("Missing" && 0);};
 void GB::OPF3() { interruptsEnabled = false; }; // DI
 void GB::OPF4() {assert("Invalid CPU Instruction" && 0);};
@@ -1330,7 +1397,7 @@ void GB::OPF8()
 	IncrementPC();
 }; // LD HL, SP+i8
 void GB::OPF9() {assert("Missing" && 0);};
-void GB::OPFA() {assert("Missing" && 0);};
+void GB::OPFA() { SetByteRegister(A_REGISTER, ReadData(ReadWord())); }; // LD A, (u16)
 void GB::OPFB()
 {
 	interruptsEnabled = true; //Enables interrupts (presumably mode 1 on the z80?) http://jgmalcolm.com/z80/advanced/im1i
@@ -1396,7 +1463,7 @@ void GB::OPCB33() {assert("Missing" && 0);};
 void GB::OPCB34() {assert("Missing" && 0);};
 void GB::OPCB35() {assert("Missing" && 0);};
 void GB::OPCB36() {assert("Missing" && 0);};
-void GB::OPCB37() {assert("Missing" && 0);};
+void GB::OPCB37() { Swap(GetByteRegister(A_REGISTER)); };
 void GB::OPCB38() {assert("Missing" && 0);};
 void GB::OPCB39() {assert("Missing" && 0);};
 void GB::OPCB3A() {assert("Missing" && 0);};
@@ -1476,13 +1543,13 @@ void GB::OPCB83() {assert("Missing" && 0);};
 void GB::OPCB84() {assert("Missing" && 0);};
 void GB::OPCB85() {assert("Missing" && 0);};
 void GB::OPCB86() {assert("Missing" && 0);};
-void GB::OPCB87() {assert("Missing" && 0);};
-void GB::OPCB88() {assert("Missing" && 0);};
-void GB::OPCB89() {assert("Missing" && 0);};
-void GB::OPCB8A() {assert("Missing" && 0);};
-void GB::OPCB8B() {assert("Missing" && 0);};
-void GB::OPCB8C() {assert("Missing" && 0);};
-void GB::OPCB8D() {assert("Missing" && 0);};
+void GB::OPCB87() { ClearBit(GetByteRegister(A_REGISTER), 0); };
+void GB::OPCB88() { ClearBit(GetByteRegister(B_REGISTER), 1); };
+void GB::OPCB89() { ClearBit(GetByteRegister(C_REGISTER), 1); };
+void GB::OPCB8A() { ClearBit(GetByteRegister(D_REGISTER), 1); };
+void GB::OPCB8B() { ClearBit(GetByteRegister(E_REGISTER), 1); };
+void GB::OPCB8C() { ClearBit(GetByteRegister(H_REGISTER), 1); };
+void GB::OPCB8D() { ClearBit(GetByteRegister(L_REGISTER), 1); };
 void GB::OPCB8E() {assert("Missing" && 0);};
 void GB::OPCB8F() {assert("Missing" && 0);};
 void GB::OPCB90() {assert("Missing" && 0);};

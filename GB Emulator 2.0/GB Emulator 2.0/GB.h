@@ -184,7 +184,7 @@ public:
         //**** 8-bit registers array
         ui8 register8bit[8]; //A/F/B/C/D/E/H/L
     };
-    ui8 m_bus[65536]; //64kb 
+    ui8 m_bus[0x10000]; //64kb 
 
     ui8* busPtr = &m_bus[0];
     ui8* dynamicPtr = nullptr;
@@ -239,6 +239,8 @@ public:
     //**** JUMPS
     void Jr();
 
+    void Jr(const ui8& address);
+
     void ADDHL(const ui16& reg);
 
     void Bit(const ui8& value, ui8 bit);
@@ -271,6 +273,10 @@ public:
 
     void AND(const ui8& value);
 
+    //CB
+
+    void Swap(ui8& value);
+
     typedef void(GB::*OPCodePtr)(void); // generic function pointer for every code
     OPCodePtr BASECodes[256];
     OPCodePtr CBCodes[256];
@@ -292,6 +298,11 @@ public:
     //**** DEBUGGING
     void OUTPUTREGISTERS(ui8 op);
     void OUTPUTCBREGISTERS(ui8 op);
+
+    //*************************************************************** JoyPad
+
+    ui8 joypadActual = 0xFF;
+    int m_joypadCycles = 0;
 
     //*************************************************************** Display
     //**** SDL
@@ -316,7 +327,6 @@ public:
     int displayEnableDelay = 0;
     int m_oam_pixel = 0;
     int m_oam_tile = 0;
-
 
     bool createSDLWindow();
 

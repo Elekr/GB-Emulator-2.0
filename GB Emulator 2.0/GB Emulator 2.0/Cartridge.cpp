@@ -1,9 +1,11 @@
 #include "Cartridge.h"
+#include <string>
+#include <iostream>
 
 bool Cartridge::Load(const char* path)
 {
 	//http://www.cplusplus.com/doc/tutorial/files/
-	ifstream file(path, ios::ate); //ate sets the initial position to the end of the file (to parse the file size)
+	ifstream file(path, ios::ate | std::ios::binary); //ate sets the initial position to the end of the file (to parse the file size)
 
 	if (!file.is_open())
 	{
@@ -11,19 +13,25 @@ bool Cartridge::Load(const char* path)
 	}
 
 	//https://stackoverflow.com/questions/2409504/using-c-filestreams-fstream-how-can-you-determine-the-size-of-a-file
-	unsigned int fileSize = file.tellg();
+	unsigned int fileSize = static_cast<int>(file.tellg());
 
 	mp_cart_data = new ui8[fileSize]; //Allocate memory for the rom 
 	file.seekg(0, std::ios::beg);
 	file.read((char*)mp_cart_data, fileSize); //Cast to char
 	file.close();
 
+	//Used for debugging issues with loading the cart in
+	/*for (int i = 0; i < 0x500; i++)
+	{
+		cout << hex << i << " " << hex << (int)mp_cart_data[i] << std::endl;
+	}*/
+
 	//Get the title of the Game
 	char* name = new char[11];
 
 	for (int i = 0; i < 10; i++)
 	{
-		name[i] = mp_cart_data[TITLE_LOC + i];
+		name[i] = mp_cart_data[TITLE_LOC + i];	
 	}
 	gameTitle = name;
 
