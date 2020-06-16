@@ -1,8 +1,9 @@
 ﻿  GB.cpp
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(787,48): warning C4305: 'argument': truncation from 'const int' to 'ui8'
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(787,33): warning C4309: 'argument': truncation of constant value
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(796,28): warning C4305: 'argument': truncation from 'const int' to 'ui8'
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(796,11): warning C4309: 'argument': truncation of constant value
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(804,30): warning C4305: 'argument': truncation from 'const int' to 'ui8'
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(804,13): warning C4309: 'argument': truncation of constant value
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(679,9): warning C4552: '&': result of expression not used
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(869,48): warning C4305: 'argument': truncation from 'const int' to 'ui8'
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(869,33): warning C4309: 'argument': truncation of constant value
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(878,28): warning C4305: 'argument': truncation from 'const int' to 'ui8'
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(878,11): warning C4309: 'argument': truncation of constant value
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(886,30): warning C4305: 'argument': truncation from 'const int' to 'ui8'
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(886,13): warning C4309: 'argument': truncation of constant value
   GB Emulator 2.0.vcxproj -> C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\Debug\GB Emulator 2.0.exe

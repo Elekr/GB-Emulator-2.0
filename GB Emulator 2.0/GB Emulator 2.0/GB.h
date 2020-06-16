@@ -43,7 +43,9 @@ enum CPUInterupt
     JOYPAD = 0x04
 };
 
-const ui8 BIOS[256] = {  //NINTENDO BOOT ROM https://realboyemulator.wordpress.com/2013/01/03/a-look-at-the-game-boy-bootstrap-let-the-fun-begin/
+const int BIOS_SIZE = 256;
+
+const ui8 BIOS[BIOS_SIZE] = {  //NINTENDO BOOT ROM https://realboyemulator.wordpress.com/2013/01/03/a-look-at-the-game-boy-bootstrap-let-the-fun-begin/
 
 	0x31, 0xfe, 0xff, 0xaf, 0x21, 0xff, 0x9f, 0x32, 0xcb, 0x7c, 0x20, 0xfb, 0x21, 0x26, 0xff, 0x0e,
 	0x11, 0x3e, 0x80, 0x32, 0xe2, 0x0c, 0x3e, 0xf3, 0xe2, 0x32, 0x3e, 0x77, 0x77, 0x3e, 0xfc, 0xe0,
@@ -109,8 +111,6 @@ const ui16 m_timer_address = 0xFF05;
 const ui16 m_timer_modulo_address = 0xFF06;
 const ui16 m_timer_controll_address = 0xFF07;
 
-
-
 //**************************************************** Display
 
 const int DISPLAY_HEIGHT = 144;
@@ -162,6 +162,15 @@ const int BACKGROUND_PALLETTE = 0xFF47;
 
 const ui16 m_cpu_interupt_flag_address = 0xFF0F;
 const ui16 m_interrupt_enabled_flag_address = 0xFFFF;
+
+const ui16 RESET_00 = 0x0000;
+const ui16 RESET_08 = 0x0008;
+const ui16 RESET_10 = 0x0010;
+const ui16 RESET_18 = 0x0018;
+const ui16 RESET_20 = 0x0020;
+const ui16 RESET_28 = 0x0028;
+const ui16 RESET_30 = 0x0030;
+const ui16 RESET_38 = 0x0038;
 
 class GB
 {
@@ -236,6 +245,8 @@ public:
 
     void XOR(const ui8& value);
 
+    void OR(const ui8 value);
+
     void LDI(const ui16 address, const ui8& reg); // https://github.com/jgilchrist/gbemu/blob/master/src/cpu/opcodes.cc
 
     void LDI(const ui8& reg, const ui16& address);
@@ -252,7 +263,13 @@ public:
 
     void SUB(const ui8& value);
 
-    void Add(const ui8& reg, const ui8& value);
+    void SBC(const ui8& value);
+
+    void ADD(const ui8& reg, const ui8& value);
+
+    void ADC(const ui8& value);
+
+    void AND(const ui8& value);
 
     typedef void(GB::*OPCodePtr)(void); // generic function pointer for every code
     OPCodePtr BASECodes[256];
@@ -307,7 +324,6 @@ public:
     void EnableLCD();
 
     bool updatePixels();
-    bool TickDisplay();
     void drawScanline();
     void handleHBlankMode(ui8& line);
     void handleVBlankMode(ui8& line, int cycles);
