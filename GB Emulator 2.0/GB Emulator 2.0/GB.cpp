@@ -2115,7 +2115,7 @@ bool GB::createSDLWindow()
 
 	SDL_Init(SDL_INIT_VIDEO);
 
-	window = SDL_CreateWindow("Gameboy Emulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, DISPLAY_WIDTH * 3, DISPLAY_HEIGHT * 3, SDL_WINDOW_ALLOW_HIGHDPI);
+	window = SDL_CreateWindow("CrosBOY", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, DISPLAY_WIDTH * 3, DISPLAY_HEIGHT * 3, SDL_WINDOW_ALLOW_HIGHDPI);
 
 	render = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
@@ -2831,18 +2831,25 @@ void GB::RenderGame()
 
 void GB::RenderBackground()
 {
-	ui16 tileData = 0;
-	ui16 backgroundData = 0;
-	ui8 palette = ReadData(BACKGROUND_PALLETTE);
 	ui8& control = ReadData(lcdcRegister);
+
 	ui8& scrollY = ReadData(SCROLL_Y);
 	ui8& scrollX = ReadData(SCROLL_X);
+
 	ui8& line = ReadData(LYRegister);
+
 	bool unsig = HasBit(control, 4); //Which tile set to use 1 or 2 (whether the data is signed or unsigned)
 
-	//Debugging
-	/*std::cout << std::dec << (int)(scrollY) << std::endl;*/
+	ui8 palette = ReadData(BACKGROUND_PALLETTE);
 
+	if (DEBUGGING)
+	{
+		std::cout << std::dec << (int)(scrollY) << std::endl;
+	}
+
+
+	ui16 tileData = 0;
+	ui16 tileMap = 0;
 	//Fetching Data for tile sets
 	if (unsig)
 	{
@@ -2851,16 +2858,15 @@ void GB::RenderBackground()
 	else
 	{
 		tileData = 0x8800;
-		//unsig = false;
 	}
 
 	if (HasBit(control, 3)) //Which background data set 
 	{
-		backgroundData = 0x9C00;
+		tileMap = 0x9C00;
 	}
 	else
 	{
-		backgroundData = 0x9800;
+		tileMap = 0x9800;
 	}
 
 	ui8 xPos = 0;
@@ -2870,21 +2876,33 @@ void GB::RenderBackground()
 	{
 		xPos = i + scrollX;
 		yPos = scrollY + line;
-		RenderTile(unsig, backgroundData, tileData, xPos, yPos, i, palette);
+		RenderTile(unsig, tileMap, tileData, xPos, yPos, i, palette);
 	}
 }
 
 void GB::RenderWindow(ui8 windowY)
 {
-	ui16 tileData = 0;
-	ui16 backgroundData = 0;
-	ui8 palette =ReadData(BACKGROUND_PALLETTE);
 	ui8& control = ReadData(lcdcRegister);
+
 	ui8& line = ReadData(LYRegister);
-	ui8 windowX = ReadData(WINDOW_X) - 7;
+
+	ui8 windowX = ReadData(WINDOW_X);
+
+	if (windowX <= 0x07)
+	{
+		windowX -= windowX;
+	}
+	else
+	{
+		windowX -= 7;
+	}
+
+	ui8 palette = ReadData(BACKGROUND_PALLETTE);
 
 	bool unsig = HasBit(control, 4); //Which tile set to use 1 or 2 (whether the data is signed or unsigned)
 
+	ui16 tileData = 0;
+	ui16 windowTileMap = 0;
 	//Fetching Data for tile sets
 	if (unsig)
 	{
@@ -2897,21 +2915,21 @@ void GB::RenderWindow(ui8 windowY)
 
 	if (HasBit(control, 6)) //Which window data set 
 	{
-		backgroundData = 0x9C00;
+		windowTileMap = 0x9C00;
 	}
 	else
 	{
-		backgroundData = 0x9800;
+		windowTileMap = 0x9800;
 	}
 
 	ui8 xPos = 0;
 	ui8 yPos = 0;
 
-	for (int i = 0; i < 160; i++)
+	for (int i = 0; i < 160; i++) //For the entire line of pixels
 	{
 		xPos = i - windowX;
 		yPos = line - windowY;
-		RenderTile(unsig, backgroundData, tileData, xPos, yPos, i, palette);
+		RenderTile(unsig, windowTileMap, tileData, xPos, yPos, i, palette);
 	}
 }
 
@@ -2921,6 +2939,7 @@ void GB::RenderSprites()
 	ui8& line = ReadData(LYRegister);
 
 	ui8 spriteHeight = 8;
+
 	if (HasBit(control, 2)) //Which window data set 
 	{
 		spriteHeight = 16;
@@ -2929,22 +2948,23 @@ void GB::RenderSprites()
 	for (int sprite = 0; sprite < 40; sprite++)
 	{
 		//Get the position and Tile index of the sprite
-		ui8 index = sprite * 4; //A sprite is 4 bytes
+		ui8 index = sprite * 4; //A sprite is 4 bytes ( starting position of the sprite)
 		ui8 yPos = ReadData(0xFE00 + index) - 16;
 		ui8 xPos = ReadData(0xFE00 + index + 1) - 8;
 		ui8 tileIndex = ReadData(0xFE00 + index + 2);
 
 		//Sprite Attributes
 		ui8 attributes = ReadData(0xFE00 + index + 3);
-
-		bool yFlip = HasBit(attributes, 6);
+		ui16 pallette = HasBit(attributes, 4) ? 0xFF49 : 0xFF48;
 		bool xFlip = HasBit(attributes, 5);
+		bool yFlip = HasBit(attributes, 6);
+		bool spriteOnTop = !HasBit(attributes, 7);
 
 		if ((line >= yPos) && (line < (yPos + spriteHeight)))
 		{
 			int spriteLine = line - yPos;
 
-			if (yFlip)
+			if (yFlip) //Change the starting position of the sprite and then reverse it
 			{
 				spriteLine -= spriteHeight;
 				spriteLine *= -1;
@@ -2963,24 +2983,31 @@ void GB::RenderSprites()
 				xPix += 7;
 
 				int pixel = xPos + xPix;
-				int position = tilePixel;
-				if (xFlip)
-				{
-					position -= 7;
-					position *= -1;
-				}
-				ui8 colourNum = (lower >> position) & 1; // Get the set bit
-				colourNum <<= 1;
-				colourNum |= (upper >> position) & 1;
 
-				if (colourNum != WHITE) // Don't need to draw clear tiles
+				if (pixel < 160 && line < 144)
 				{
-					int pixelIndex = pixel + DISPLAY_WIDTH * line;
-					pixelRGB colour = classicPallette[colourNum];
-					//Store them in the framebuffer
-					frameBuffer[pixelIndex * 4] = colour.blue;
-					frameBuffer[pixelIndex * 4 + 1] = colour.green;
-					frameBuffer[pixelIndex * 4 + 2] = colour.red;
+					int position = tilePixel;
+					ui8 colourNum = 0x00;
+					if (xFlip)
+					{
+						position -= 7;
+						position *= -1;
+					}
+
+					colourNum = (ui8)(lower >> position) & 1; // Get the set bit
+					colourNum <<= 1;
+					colourNum |= (ui8)(upper >> position) & 1;
+
+					if (colourNum != WHITE) // Don't need to draw clear tiles
+					{
+						int pixelIndex = pixel + (DISPLAY_WIDTH * line);
+						//TODO: check if the sprite is on top
+						pixelRGB colour = classicPallette[(pallette >> colourNum * 2) & 3];
+						//Store them in the framebuffer
+						frameBuffer[pixelIndex * 4] = colour.blue;
+						frameBuffer[pixelIndex * 4 + 1] = colour.green;
+						frameBuffer[pixelIndex * 4 + 2] = colour.red;
+					}
 				}
 			}
 
@@ -2996,7 +3023,7 @@ void GB::RenderTile(bool unsig, ui16 tileMap, ui16 tileData, ui8 xPos, ui8 yPos,
 	// Out of the 32 horizontal tiles, what one are we currently on
 	ui8 tileColumn = (xPos / 8);
 	//Get the address for the tileData
-	ui16 tileAddress = tileData + tileRow + tileColumn;
+	ui16 tileAddress = tileMap + tileRow + tileColumn;
 	ui16 tileLocation = tileData;
 	i16 currentTile;
 

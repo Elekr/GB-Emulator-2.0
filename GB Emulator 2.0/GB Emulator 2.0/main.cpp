@@ -9,6 +9,7 @@ int main(int argc, char* argv[])
 	gameboy->createSDLWindow();
 
 	gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Tetris.gb");
+	//gameboy->InitEMU("C:/Users/Tom\Documents/GB-Emulator-2.0/Games/cpu_individual/01-special.gb");
 	gameboy->addBIOS();
 
 	int cycles;

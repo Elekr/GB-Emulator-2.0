@@ -5,7 +5,4 @@ C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(79
 C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(796,11): warning C4309: 'argument': truncation of constant value
 C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(804,30): warning C4305: 'argument': truncation from 'const int' to 'ui8'
 C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(804,13): warning C4309: 'argument': truncation of constant value
-  main.cpp
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\main.cpp(14,6): warning C4101: 'cycles': unreferenced local variable
-  Generating Code...
   GB Emulator 2.0.vcxproj -> C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\Debug\GB Emulator 2.0.exe
