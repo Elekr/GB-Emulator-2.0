@@ -125,7 +125,7 @@ void GB::WriteData(ui16 address, ui8 data)
 		}
 		case 0xFF50: // Boot rom switch
 		{
-			// To do, switch from BIOS to cart and back
+			std::cout << "IT WORKS" << std::endl;
 			m_bus[address] = data;
 			break;
 		}
@@ -588,6 +588,20 @@ void GB::SUB(const ui8& value)
 	}
 }
 
+void GB::Add(const ui8& reg, const ui8& value)
+{
+	int result = GetByteRegister(reg) + value;
+	int carrybits = GetByteRegister(reg) ^ value ^ result;
+
+	SetByteRegister(A_REGISTER, static_cast<ui8> (result));
+
+
+	SetFlag(FLAG_ZERO, GetByteRegister(A_REGISTER) == 0);
+	SetFlag(FLAG_CARRY, (carrybits & 0x100) != 0);
+	SetFlag(FLAG_HALFCARRY, (carrybits & 0x10) != 0);
+	SetFlag(FLAG_SUBTRACT, false);
+}
+
 void GB::NextFrame()
 {
 	while(!TickCPU());
@@ -612,7 +626,7 @@ bool GB::TickCPU()
 		(this->*CBCodes[OPCode])();
 		if (DEBUGGING)
 		{
-			if (GetWordRegister(PC_REGISTER) > 0x6C && GetWordRegister(PC_REGISTER) < 0x95 /*&& ReadData(LYRegister) > 0x8e*/)
+			if (GetWordRegister(PC_REGISTER) > 0xE0 /*&& GetWordRegister(PC_REGISTER) < 0x95*/ /*&& ReadData(LYRegister) > 0x8e*/)
 			{
 				OUTPUTCBREGISTERS(OPCode);
 			}
@@ -624,7 +638,7 @@ bool GB::TickCPU()
 		(this->*BASECodes[OPCode])();
 		if (DEBUGGING)
 		{
-			if (GetWordRegister(PC_REGISTER) > 0x6C && GetWordRegister(PC_REGISTER) < 0x95 /*&& ReadData(LYRegister) > 0x8e*/)
+			if (GetWordRegister(PC_REGISTER) > 0xE0 /*&& GetWordRegister(PC_REGISTER) < 0x95*/ /*&& ReadData(LYRegister) > 0x8e*/)
 			{
 				OUTPUTREGISTERS(OPCode);
 			}
@@ -1005,7 +1019,7 @@ void GB::OP74() {assert("Missing" && 0);};
 void GB::OP75() {assert("Missing" && 0);};
 void GB::OP76() {assert("Missing" && 0);};
 void GB::OP77() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(A_REGISTER)); }; // LD (HL), A
-void GB::OP78() {assert("Missing" && 0);};
+void GB::OP78() {SetByteRegister(A_REGISTER, GetByteRegister(B_REGISTER));};
 void GB::OP79() {assert("Missing" && 0);};
 void GB::OP7A() {assert("Missing" && 0);};
 void GB::OP7B() { SetByteRegister(A_REGISTER, GetByteRegister(E_REGISTER)); };
@@ -1019,7 +1033,7 @@ void GB::OP82() {assert("Missing" && 0);};
 void GB::OP83() {assert("Missing" && 0);};
 void GB::OP84() {assert("Missing" && 0);};
 void GB::OP85() {assert("Missing" && 0);};
-void GB::OP86() {assert("Missing" && 0);};
+void GB::OP86() {Add(A_REGISTER, ReadData(GetWordRegister(HL_REGISTER)));};
 void GB::OP87() {assert("Missing" && 0);};
 void GB::OP88() {assert("Missing" && 0);};
 void GB::OP89() {assert("Missing" && 0);};
@@ -3027,10 +3041,10 @@ void GB::RenderTile(bool unsig, ui16 tileMap, ui16 tileData, ui8 xPos, ui8 yPos,
 
 
 
-	if (colourNum == LIGHT_GREY)
-	{
-		std::cout << "hello" << std::endl;
-	}
+	//if (colourNum == LIGHT_GREY)
+	//{
+	//	std::cout << "hello" << std::endl;
+	//}
 
 	//Store them in the framebuffer
 	frameBuffer[pixelIndex * 4] = colour.blue;
