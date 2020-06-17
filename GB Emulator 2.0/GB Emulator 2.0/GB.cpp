@@ -27,7 +27,6 @@ void GB::addBIOS()
 	{
 		m_bus[i] = BIOS[i];
 	}
-	WriteData(0xFF00, 0xFF);
 }
 
 void GB::Reset()
@@ -71,7 +70,7 @@ void GB::Reset()
 	videoCycles = 0;
 	currentMode = V_BLANK;
 
-	//InitClockFrequency();
+	ClockFrequency();
 }
 
 void GB::WriteData(ui16 address, ui8 data)
@@ -105,7 +104,7 @@ void GB::WriteData(ui16 address, ui8 data)
 		case 0xFF00: // Input
 		{
 			m_bus[address] = data;
-			// To do: Joypad
+			UpdateJoyPad();
 			break;
 		}
 		case 0xFF04: // Timer divider
@@ -155,12 +154,21 @@ void GB::WriteData(ui16 address, ui8 data)
 				else
 				{
 					std::cout << "Booted Successfully" << std::endl;
-					//DEBUGGING = true;
+					DEBUGGING = true;
+					std::cout << std::hex << (int)m_bus[0x2f0] << std::endl;
 
-					ui8* cartridgeMemory = m_cartridge.GetRawData();
+					//ui8* cartridgeMemory = m_cartridge.GetRawData();
+					//for (int i = 0; i < BIOS_SIZE; i++)
+					//{
+					//	m_bus[i] = cartridgeMemory[i];
+					//}
+
+					memcpy(m_bus, m_cartridge.GetRawData(), 0x8000);
+					//WriteData(0xFF00, 0xFF);
+
 					for (int i = 0; i < BIOS_SIZE; i++)
 					{
-						m_bus[i] = cartridgeMemory[i];
+						std::cout << std::hex << i << " " << std::hex << (int)m_bus[i] << std::endl;
 					}
 
 				}
@@ -169,19 +177,6 @@ void GB::WriteData(ui16 address, ui8 data)
 		}
 		default:
 		{
-			// Video BG Palette
-			// Video Sprite Palette 0
-			// Video Sprite Palette 1
-			// Video Window Y
-			// Video Window X
-			// Serial
-			// Video LYC
-			// Video Status
-			// Video Scroll Y
-			// Video Scroll X
-			// CPU Interrupt Flag
-			// Timer
-			// Timer Modulo
 			m_bus[address] = data;
 		}
 		}
@@ -697,8 +692,9 @@ void GB::ADC(const ui8& value)
 
 void GB::AND(const ui8& value)
 {
-	ui8& result = GetByteRegister(A_REGISTER);
-	result & value;
+	ui8 result = GetByteRegister(A_REGISTER) & value;
+
+	SetByteRegister(A_REGISTER, result);
 
 	ClearFlags();
 	SetFlag(FLAG_ZERO, result == 0);
@@ -738,6 +734,9 @@ bool GB::TickCPU()
 	cycle = (normalCycles[OPCode] * 4);
 	cycles += cycle;
 
+	int address1 = 0x2EC;
+	int address2 = 0x2F1;
+
 	if (OPCode == 0xCB) // Extra Codes
 	{
 		OPCode = ReadNextCode();
@@ -748,10 +747,13 @@ bool GB::TickCPU()
 		(this->*CBCodes[OPCode])();
 		if (DEBUGGING)
 		{
-			if (GetWordRegister(PC_REGISTER) >= 0x270 /*&& GetWordRegister(PC_REGISTER) < 0x95*/ /*&& ReadData(LYRegister) > 0x8e*/)
+			if (GetWordRegister(PC_REGISTER) >= address1 /*&& GetWordRegister(PC_REGISTER) < address2*/ /*&& ReadData(LYRegister) > 0x8e*/)
 			{
-				OUTPUTCBREGISTERS(OPCode);
+				/*OUTPUTCBREGISTERS(OPCode);*/
+				std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;
 			}
+			
+			//OUTPUTCBREGISTERS(OPCode);
 		}
 
 	}
@@ -760,18 +762,19 @@ bool GB::TickCPU()
 		(this->*BASECodes[OPCode])();
 		if (DEBUGGING)
 		{
-			if (GetWordRegister(PC_REGISTER) >= 0x270 /*&& GetWordRegister(PC_REGISTER) < 0x95*/ /*&& ReadData(LYRegister) > 0x8e*/)
+			if (GetWordRegister(PC_REGISTER) >= address1 /*&& GetWordRegister(PC_REGISTER) < address2*/ /*&& ReadData(LYRegister) > 0x8e*/)
 			{
-				OUTPUTREGISTERS(OPCode);
+				/*OUTPUTREGISTERS(OPCode);*/
+				std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;
 			}
+			
+			//OUTPUTCBREGISTERS(OPCode);
 		}
 
 	}
 	TickClock();
 	bool vSync = updatePixels();
-
-
-
+	//JoyPadTick();
 	return vSync;
 }
 
@@ -841,7 +844,7 @@ void GB::ClockFrequency()
 
 void GB::RequestInterupt(CPUInterupt interupt)
 {
-	ReadData(0xFF0F) |= 1 << (ui8)interupt;
+	ReadData(m_cpu_interupt_flag_address) |= 1 << (ui8)interupt;
 }
 
 void GB::UpdateLCDStatus()
@@ -854,18 +857,25 @@ void GB::UpdateLCDStatus()
 void GB::CheckInterrupts()
 {
 	ui8& interupt_flags = ReadData(m_cpu_interupt_flag_address);
-	ui8& interupt_enabled_flags = ReadData(m_interrupt_enabled_flag_address);
+	//ui8& interupt_enabled_flags = ReadData(m_interrupt_enabled_flag_address);
 
-	ui8 interuptsToProcess = interupt_flags & interupt_enabled_flags; //figure out how this works
+	//ui8 interuptsToProcess = interupt_flags & interupt_enabled_flags; //figure out how this works
+	if (DEBUGGING)
+	{
+		/*std::cout << "Interrupts flags" << std::bitset<8>((int)interupt_flags) << std::endl;
+		std::cout << "Interrupts enabled" << std::bitset<8>((int)interupt_flags) << std::endl;*/
+		//std::cout << "Interrupts to process" <<  (int)interuptsToProcess << std::endl;
+	}
 
-	if (interuptsToProcess > 0)
+
+	if (interupt_flags > 0)
 	{
 		if (interruptsEnabled)
 		{
 			// Loop through for all possible interrupts 
 			for (int i = 0; i < 5; i++)
 			{
-				if (HasBit(interuptsToProcess, i))
+				if (HasBit(interupt_flags, i))
 				{
 					interruptsEnabled = false; // Since we are now in a interrupt we need to disable future ones
 					halt = false;
@@ -1308,7 +1318,11 @@ void GB::OPD5() { PushStack(DE_REGISTER); }; // PUSH DE
 void GB::OPD6() {assert("Missing" && 0);};
 void GB::OPD7() {assert("Missing" && 0);};
 void GB::OPD8() {assert("Missing" && 0);};
-void GB::OPD9() {assert("Missing" && 0);};
+void GB::OPD9() 
+{
+	PopStackPC();
+	interruptsEnabled = true;
+};
 void GB::OPDA() {assert("Missing" && 0);};
 void GB::OPDB() {assert("Missing" && 0);};
 void GB::OPDC() 
@@ -1361,7 +1375,7 @@ void GB::OPEF()
 	PushStack(PC_REGISTER);
 	SetPC(RESET_28);
 };
-void GB::OPF0() { SetByteRegister(A_REGISTER, ReadData(static_cast<ui16> (0xFF00 + ReadByte()))); }; // LD A, (FF00+u8)
+void GB::OPF0() { SetByteRegister(A_REGISTER, ReadData(static_cast<ui16>(0xFF00 + ReadByte()))); }; // LD A, (FF00+u8)
 void GB::OPF1() 
 {
 	PopStack(AF_REGISTER);
@@ -2260,6 +2274,12 @@ void GB::OUTPUTREGISTERS(ui8 op)
 
 	std::cout << "0xFF42 is ";
 	PrintHex(m_bus[0xFF42]);
+	std::cout << "                   0xFF85 is ";
+	PrintHex(m_bus[0xFF85]);
+	std::cout << std::endl;
+
+	std::cout << "0xFF00 is ";
+	PrintHex(m_bus[0xFF00]);
 	std::cout << std::endl;
 
 	std::cout << std::bitset<8>(register8bit[F_REGISTER]) << "<- Flags" << std::endl;
@@ -2338,6 +2358,12 @@ void GB::OUTPUTCBREGISTERS(ui8 op)
 
 	std::cout << "0xFF42 is ";
 	PrintHex(m_bus[0xFF42]);
+	std::cout << "                   0xFF85 is ";
+	PrintHex(m_bus[0xFF85]);
+	std::cout << std::endl;
+
+	std::cout << "0xFF00 is ";
+	PrintHex(m_bus[0xFF00]);
 	std::cout << std::endl;
 
 	std::cout << std::bitset<8>(register8bit[F_REGISTER]) << std::endl;
@@ -2347,6 +2373,45 @@ void GB::OUTPUTCBREGISTERS(ui8 op)
 	system("pause");
 
 	std::cout << std::endl;
+}
+
+void GB::JoyPadTick()
+{
+	m_joypadCycles += cycle;
+	if (m_joypadCycles >= joypadCyclesRefresh)
+	{
+		UpdateJoyPad();
+		m_joypadCycles = 0;
+	}
+}
+
+void GB::UpdateJoyPad()
+{
+	ui8 current = bus.io.joypad & 0xF0;
+
+	switch (current & 0x30)
+	{
+	case 0x10:
+	{
+		ui8 topJoypad = (joypadActual >> 4) & 0x0F;
+		current |= topJoypad;
+		break;
+	}
+	case 0x20:
+	{
+		ui8 bottomJoypad = joypadActual & 0x0F;
+		current |= bottomJoypad;
+		break;
+	}
+	case 0x30:
+		current |= 0x0F;
+		break;
+	}
+
+	if ((bus.io.joypad & ~current & 0x0F) != 0)
+		RequestInterupt(JOYPAD);
+
+	bus.io.joypad = current;
 }
 
 bool GB::createSDLWindow()
@@ -2523,8 +2588,6 @@ void GB::handleHBlankMode(ui8& line)
 		{
 			currentMode = V_BLANK;
 
-			
-
 			RequestInterupt(VBLANK);
 
 			//transfer the data to the pixels array?
@@ -2635,10 +2698,10 @@ void GB::RenderBackground()
 
 	ui8 palette = ReadData(BACKGROUND_PALLETTE);
 
-	if (DEBUGGING)
-	{
-		std::cout << std::dec << (int)(scrollY) << std::endl;
-	}
+	//if (DEBUGGING)
+	//{
+	//	std::cout << std::dec << (int)(scrollY) << std::endl;
+	//}
 
 
 	ui16 tileData = 0;

@@ -111,6 +111,10 @@ const ui16 m_timer_address = 0xFF05;
 const ui16 m_timer_modulo_address = 0xFF06;
 const ui16 m_timer_controll_address = 0xFF07;
 
+//**************************************************** JoyPad
+
+const int joypadCyclesRefresh = 65536;
+
 //**************************************************** Display
 
 const int DISPLAY_HEIGHT = 144;
@@ -184,7 +188,56 @@ public:
         //**** 8-bit registers array
         ui8 register8bit[8]; //A/F/B/C/D/E/H/L
     };
-    ui8 m_bus[0x10000]; //64kb 
+
+    //**** MEMORY BUS
+    union //Divides the memory bus into sections keeping the same memory addresses https://wornwinter.wordpress.com/2015/02/14/adventures-in-gameboy-emulation-part-2-the-cpu/
+    {
+        //http://gameboy.mongenel.com/dmg/asmmemmap.html for the byte ranges
+        struct BUS
+        {
+            ui8 cartridge[0x8000]; //32kb for rom only
+            ui8 video[0x2000]; //8kb 
+            ui8 ramBank[0x2000]; //8kb
+            ui8 ram[0x2000]; //8kb
+            ui8 echoRam[0x1E00]; //7.6kb
+            ui8 oam[0xA0]; //160
+            ui8 unusable[0x60]; //96
+            union
+            {
+                struct
+                {
+                    ui8 joypad;                 // 0xFF00
+                    ui8 serial;                 // 0xFF01
+                    ui8 pad1[2];
+                    ui8 timer_divider;          // 0xFF04
+                    ui8 timer;                  // 0xFF05
+                    ui8 timer_modulo;           // 0xFF06
+                    ui8 timer_control;          // 0xFF07
+                    ui8 pad2[8];
+                    ui8 cpu_interupt_flag;      // 0xFF0F
+                    ui8 pad3[31];
+                    ui8 video_control;          // 0xFF40
+                    ui8 video_status;           // 0xFF41
+                    ui8 video_scroll_y;         // 0xFF42
+                    ui8 video_scroll_x;         // 0xFF43
+                    ui8 video_line_val;         // 0xFF44
+                    ui8 video_lyc;              // 0xFF45
+                    ui8 transfer_sprites_dma;   // 0xFF46
+                    ui8 video_bg_palette;       // 0xFF47
+                    ui8 video_sprite_palette_0; // 0xFF48
+                    ui8 video_sprite_palette_1; // 0xFF49
+                    ui8 video_window_y;         // 0xFF4A
+                    ui8 video_window_x;         // 0xFF4B
+                    ui8 pad4[5];
+                    ui8 boot_rom_switch;        // 0xFF50
+                }io;
+                ui8 m_io[0x80];
+            };
+            ui8 internal_ram[0x7F];             // 0x7F
+            ui8 interrupt;
+        }bus;
+        ui8 m_bus[0x10000]; //64kb 
+    };
 
     ui8* busPtr = &m_bus[0];
     ui8* dynamicPtr = nullptr;
@@ -193,7 +246,6 @@ public:
 
     //**** Interrupts
     bool interruptsEnabled = false;
-    bool running = false;
     bool halt = false;
 
     GB();
@@ -304,6 +356,9 @@ public:
     ui8 joypadActual = 0xFF;
     int m_joypadCycles = 0;
 
+    void JoyPadTick();
+    void UpdateJoyPad();
+
     //*************************************************************** Display
     //**** SDL
     SDL_Window* window;
@@ -347,13 +402,12 @@ public:
     void RenderSprites();
     void RenderTile(bool unsig, ui16 tileMap, ui16 tileData, ui8 xPos, ui8 yPos, ui8 pixel, ui8 pallette);
 
-    void RequestInterupt(CPUInterupt interupt); //Handle interupt requests from the Display
+    void RequestInterupt(CPUInterupt interupt); //Handle interupt requests 
     void UpdateLCDStatus();
     void CheckInterrupts();
     void CompareLYWithLYC();
 
     bool DEBUGGING = false;
-
 
 //OP CODES
     void OP00(); // NOP

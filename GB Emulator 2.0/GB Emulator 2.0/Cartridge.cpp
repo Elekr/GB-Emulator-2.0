@@ -21,10 +21,10 @@ bool Cartridge::Load(const char* path)
 	file.close();
 
 	//Used for debugging issues with loading the cart in
-	/*for (int i = 0; i < 0x500; i++)
-	{
-		cout << hex << i << " " << hex << (int)mp_cart_data[i] << std::endl;
-	}*/
+	//for (int i = 0; i < 0x100; i++)
+	//{
+	//	cout << hex << i << " " << hex << (int)mp_cart_data[i] << std::endl;
+	//}
 
 	//Get the title of the Game
 	char* name = new char[11];
