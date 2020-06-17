@@ -273,7 +273,7 @@ public:
 
     //**** BITS
     bool HasBit(ui8 data, ui8 bit); //used for the Display potentially can change check flag around 
-    void SetBit(ui8 data, ui8 bit);
+    void SetBit(ui8& data, ui8 bit);
     void ClearBit(ui8 data, ui8 bit);
 
     inline void PushStack(ui8 reg);
@@ -364,7 +364,7 @@ public:
     SDL_Window* window;
     SDL_Renderer* render;
     SDL_Texture* screen_texture;
-
+    pixelRGB* currentPallete = classicPallette;
     pixelRGB classicPallette[4] = { { 155,188,15 }, { 139,172,15 }, { 48,98,48 }, { 15,56,15 } };
     pixelRGB greyPallette[4] = { { 255,255,255 },{ 0xCC,0xCC,0xCC },{ 0x77,0x77,0x77 }, { 0x0,0x0,0x0 } };
 
@@ -401,6 +401,7 @@ public:
     void RenderWindow(ui8 windowY);
     void RenderSprites();
     void RenderTile(bool unsig, ui16 tileMap, ui16 tileData, ui8 xPos, ui8 yPos, ui8 pixel, ui8 pallette);
+    colours getColourFromPallette(ui8 pallete, colours originalColour);
 
     void RequestInterupt(CPUInterupt interupt); //Handle interupt requests 
     void UpdateLCDStatus();

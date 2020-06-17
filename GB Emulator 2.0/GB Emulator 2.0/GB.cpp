@@ -155,7 +155,7 @@ void GB::WriteData(ui16 address, ui8 data)
 				{
 					std::cout << "Booted Successfully" << std::endl;
 					DEBUGGING = true;
-					std::cout << std::hex << (int)m_bus[0x2f0] << std::endl;
+				/*	std::cout << std::hex << (int)m_bus[0x2f0] << std::endl;*/
 
 					//ui8* cartridgeMemory = m_cartridge.GetRawData();
 					//for (int i = 0; i < BIOS_SIZE; i++)
@@ -163,13 +163,13 @@ void GB::WriteData(ui16 address, ui8 data)
 					//	m_bus[i] = cartridgeMemory[i];
 					//}
 
-					memcpy(m_bus, m_cartridge.GetRawData(), 0x8000);
-					//WriteData(0xFF00, 0xFF);
+					memcpy(m_bus, m_cartridge.GetRawData(), BIOS_SIZE);
 
-					for (int i = 0; i < BIOS_SIZE; i++)
-					{
-						std::cout << std::hex << i << " " << std::hex << (int)m_bus[i] << std::endl;
-					}
+					//DEBUGGING Display the first 256 bytes to see if bios has been overwritten
+					//for (int i = 0; i < BIOS_SIZE; i++)
+					//{
+					//	std::cout << std::hex << i << " " << std::hex << (int)m_bus[i] << std::endl;
+					//}
 
 				}
 			m_bus[address] = data;
@@ -207,12 +207,9 @@ void GB::WriteData(ui16 address, ui8 data)
 	// Interrupt
 	if (address == 0xFFFF) // Low Frequancy
 	{
-		// To do
+		//m_bus[address] = data;
 		return;
 	}
-
-
-
 
 
 	// Unusable Memory
@@ -309,7 +306,7 @@ bool GB::HasBit(ui8 data, ui8 bit)
 	return (data >> bit) & 1;
 }
 
-void GB::SetBit(ui8 data, ui8 bit)
+void GB::SetBit(ui8& data, ui8 bit)
 {
 	data |= 0x1 << bit;
 }
@@ -474,10 +471,9 @@ void GB::ADDHL(const ui16& reg)
 
 void GB::Bit(const ui8& value, ui8 bit)
 {
-	ClearFlags();
-	//CHECK IF BIT OF THE REGISTER HAS BEEN SET
 	SetFlag(FLAG_ZERO, ((value >> bit) & 0x01) == 0);
 	SetFlag(FLAG_HALFCARRY, true);
+	SetFlag(FLAG_SUBTRACT, false);
 }
 
 void GB::XOR(const ui8& value)
@@ -725,17 +721,13 @@ void GB::NextFrame()
 bool GB::TickCPU()
 {
 	CheckInterrupts();
-	if (GetWordRegister(PC_REGISTER) == 0x150)
-	{
-		std::cout << "yeet" << std::endl;
-	}
 	OPCode = ReadNextCode();
 
 	cycle = (normalCycles[OPCode] * 4);
 	cycles += cycle;
 
-	int address1 = 0x2EC;
-	int address2 = 0x2F1;
+	int address1 = 0x2f1;
+	int address2 = 0x2F4;
 
 	if (OPCode == 0xCB) // Extra Codes
 	{
@@ -747,9 +739,9 @@ bool GB::TickCPU()
 		(this->*CBCodes[OPCode])();
 		if (DEBUGGING)
 		{
-			if (GetWordRegister(PC_REGISTER) >= address1 /*&& GetWordRegister(PC_REGISTER) < address2*/ /*&& ReadData(LYRegister) > 0x8e*/)
+			if (GetWordRegister(PC_REGISTER) >= address1 && GetWordRegister(PC_REGISTER) < address2 /*&& ReadData(LYRegister) > 0x8e*/)
 			{
-				/*OUTPUTCBREGISTERS(OPCode);*/
+				//OUTPUTCBREGISTERS(OPCode);
 				std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;
 			}
 			
@@ -762,9 +754,9 @@ bool GB::TickCPU()
 		(this->*BASECodes[OPCode])();
 		if (DEBUGGING)
 		{
-			if (GetWordRegister(PC_REGISTER) >= address1 /*&& GetWordRegister(PC_REGISTER) < address2*/ /*&& ReadData(LYRegister) > 0x8e*/)
+			if (GetWordRegister(PC_REGISTER) >= address1 && GetWordRegister(PC_REGISTER) < address2 /*&& ReadData(LYRegister) > 0x8e*/)
 			{
-				/*OUTPUTREGISTERS(OPCode);*/
+				//OUTPUTREGISTERS(OPCode);
 				std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;
 			}
 			
@@ -857,9 +849,9 @@ void GB::UpdateLCDStatus()
 void GB::CheckInterrupts()
 {
 	ui8& interupt_flags = ReadData(m_cpu_interupt_flag_address);
-	//ui8& interupt_enabled_flags = ReadData(m_interrupt_enabled_flag_address);
+	ui8& interupt_enabled_flags = ReadData(m_interrupt_enabled_flag_address);
 
-	//ui8 interuptsToProcess = interupt_flags & interupt_enabled_flags; //figure out how this works
+	ui8 interuptsToProcess = interupt_flags & interupt_enabled_flags; //figure out how this works
 	if (DEBUGGING)
 	{
 		/*std::cout << "Interrupts flags" << std::bitset<8>((int)interupt_flags) << std::endl;
@@ -868,7 +860,7 @@ void GB::CheckInterrupts()
 	}
 
 
-	if (interupt_flags > 0)
+	if (interuptsToProcess > 0)
 	{
 		if (interruptsEnabled)
 		{
@@ -898,6 +890,9 @@ void GB::CheckInterrupts()
 					case 4: // Joypad
 						SetPC(0x0060);
 						break;
+					default:
+						assert(0 && "Unqnown interupt");
+						break;
 					}
 					return;
 				}
@@ -925,7 +920,7 @@ void GB::CompareLYWithLYC()
 
 		if (LYC == line)
 		{
-			SetBit(statusRegister, 2);
+			SetBit(status, 2);
 			if (HasBit(status, 6))
 			{
 				//LCD Interrupt
@@ -972,9 +967,9 @@ void GB::OP0C() { INCByteRegister(C_REGISTER); }; // INC C
 void GB::OP0D() { DECByteRegister(C_REGISTER); }; // DEC C
 void GB::OP0E() { SetByteRegister(C_REGISTER, ReadByte()); }; // LD C, ui8
 void GB::OP0F() { RRC(GetByteRegister(A_REGISTER), true); }; // RRCA
-void GB::OP10() { IncrementPC(); }; // STOP (does nothing unless gbc
+void GB::OP10() { IncrementPC(); }; // STOP (does nothing unless gbc)
 void GB::OP11() { SetWordRegister(DE_REGISTER, ReadWord()); }; // LD DE, nn
-void GB::OP12() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(A_REGISTER)); }; // LD (DE), A
+void GB::OP12() { WriteData(GetWordRegister(DE_REGISTER), GetByteRegister(A_REGISTER)); }; // LD (DE), A
 void GB::OP13() { GetWordRegister(DE_REGISTER)++; }; // INC DE
 void GB::OP14() { INCByteRegister(D_REGISTER); }; // INC D
 void GB::OP15() { DECByteRegister(D_REGISTER); }; // DEC D
@@ -1083,12 +1078,31 @@ void GB::OP34()
 	ui8 byte = ReadData(HL_REGISTER); // store the data
 	byte++; // inc
 	WriteData(GetWordRegister(HL_REGISTER), byte);
+
+	bool hasCarry = CheckFlag(FLAG_CARRY);
+
+	ClearFlags();
+
+	SetFlag(FLAG_CARRY, hasCarry);
+	SetFlag(FLAG_ZERO, byte == 0);
+	SetFlag(FLAG_HALFCARRY, (byte & 0x0F) == 0x00);
+
 }; // INC (HL)
 void GB::OP35()
 {
-	ui8 byte = ReadData(HL_REGISTER); // store the data
-	byte++; // inc
-	WriteData(GetWordRegister(HL_REGISTER), byte);
+	ui8 data = ReadData(GetWordRegister(HL_REGISTER));
+	data--;
+	WriteData(GetWordRegister(HL_REGISTER), data);
+
+	if (!CheckFlag(FLAG_CARRY))
+	{
+		ClearFlags();
+	}
+
+	SetFlag(FLAG_ZERO, data == 0);
+	SetFlag(FLAG_SUBTRACT, true);
+	SetFlag(FLAG_HALFCARRY, (data & 0x0F) == 0x0F);
+
 } // return data back}; // DEC (HL)
 void GB::OP36() { WriteData(GetWordRegister(HL_REGISTER), ReadByte()); }; // LD (HL) ui8
 void GB::OP37() 
@@ -1096,6 +1110,7 @@ void GB::OP37()
 	SetFlag(FLAG_CARRY, true);
 	SetFlag(FLAG_HALFCARRY, false);
 	SetFlag(FLAG_SUBTRACT, false);
+
 }; // SCF http://z80-heaven.wikidot.com/instructions-set:scf
 void GB::OP38() 
 {
@@ -1228,7 +1243,7 @@ void GB::OPA3() { AND(GetByteRegister(E_REGISTER)); }; // AND A, E
 void GB::OPA4() { AND(GetByteRegister(H_REGISTER)); }; // AND A, H
 void GB::OPA5() { AND(GetByteRegister(L_REGISTER)); }; // AND A, L
 void GB::OPA6() { AND(ReadData(GetWordRegister(HL_REGISTER))); }; // AND A, (HL)
-void GB::OPA7() { AND(GetByteRegister(B_REGISTER)); }; // AND A, A
+void GB::OPA7() { AND(GetByteRegister(A_REGISTER)); }; // AND A, A
 void GB::OPA8() { XOR(GetByteRegister(B_REGISTER)); }; // XOR A, B
 void GB::OPA9() { XOR(GetByteRegister(C_REGISTER)); }; // XOR A, C
 void GB::OPAA() { XOR(GetByteRegister(D_REGISTER)); }; // XOR A, D
@@ -1263,9 +1278,17 @@ void GB::OPC0()
 void GB::OPC1() { PopStack(BC_REGISTER); }; // POP BC
 void GB::OPC2() {assert("Missing" && 0);};
 void GB::OPC3() { SetPC(ReadWord()); }; //JP u16
-void GB::OPC4() {assert("Missing" && 0);};
+void GB::OPC4() 
+{
+	ui16 word = ReadWord();
+	if (!CheckFlag(FLAG_ZERO))
+	{
+		PushStack(PC_REGISTER);
+		SetPC(word);
+	}
+};
 void GB::OPC5() { PushStack(BC_REGISTER); }; // PUSH BC
-void GB::OPC6() {assert("Missing" && 0);};
+void GB::OPC6() { ADD(A_REGISTER, ReadByte()); }; // ADD A, ui8
 void GB::OPC7() {assert("Missing" && 0);};
 void GB::OPC8() 
 {
@@ -1315,7 +1338,7 @@ void GB::OPD4()
 	}
 }; // CALL NC, ui16
 void GB::OPD5() { PushStack(DE_REGISTER); }; // PUSH DE
-void GB::OPD6() {assert("Missing" && 0);};
+void GB::OPD6() { SUB(ReadByte()); }; // SUB ui8
 void GB::OPD7() {assert("Missing" && 0);};
 void GB::OPD8() {assert("Missing" && 0);};
 void GB::OPD9() 
@@ -1337,9 +1360,9 @@ void GB::OPDC()
 void GB::OPDD() {assert("Invalid CPU Instruction" && 0);};
 void GB::OPDE() {assert("Missing" && 0);};
 void GB::OPDF() {assert("Missing" && 0);};
-void GB::OPE0() { WriteData((0xFF00 + ReadByte()), GetByteRegister(A_REGISTER)); }; // LD (FF00+UI8), A
+void GB::OPE0() { WriteData(static_cast<ui16> (0xFF00 + ReadByte()), GetByteRegister(A_REGISTER)); }; // LD (FF00+UI8), A
 void GB::OPE1() { PopStack(HL_REGISTER); }; // POP HL
-void GB::OPE2() { WriteData(0xff00 + GetByteRegister(C_REGISTER), GetByteRegister(A_REGISTER)); }; // LD (FF00 + C), A
+void GB::OPE2() { WriteData(static_cast<ui16> (0xFF00 + GetByteRegister(C_REGISTER)), GetByteRegister(A_REGISTER)); }; // LD (FF00 + C), A
 void GB::OPE3() {assert("Missing" && 0);};
 void GB::OPE4() {assert("Missing" && 0);};
 void GB::OPE5() { PushStack(HL_REGISTER); }; // PUSH HL
@@ -1416,10 +1439,10 @@ void GB::OPFB()
 {
 	interruptsEnabled = true; //Enables interrupts (presumably mode 1 on the z80?) http://jgmalcolm.com/z80/advanced/im1i
 } // EI
-void GB::OPFC() {};
-void GB::OPFD() {};
+void GB::OPFC() { assert(0 && "Invalid CPU"); };
+void GB::OPFD() { assert(0 && "Invalid CPU"); };
 void GB::OPFE() { CP(ReadByte()); }; // CP, n
-void GB::OPFF() {};
+void GB::OPFF() { assert("Missing" && 0); };
 
 //CB OP CODES
 void GB::OPCB00() {assert("Missing" && 0);};
@@ -2904,9 +2927,9 @@ void GB::RenderTile(bool unsig, ui16 tileMap, ui16 tileData, ui8 xPos, ui8 yPos,
 	colourBit = -colourBit;
 
 	//Combining the tile data together to create the value for the pixel colour
-	int colourNum = (ui8)(lower >> colourBit) & 1; // Get the set bit
+	int colourNum = (lower >> colourBit) & 1; // Get the set bit
 	colourNum <<= 1;
-	colourNum |= (ui8)(upper >> colourBit) & 1;
+	colourNum |= (upper >> colourBit) & 1;
 	//Visual representation below
 
 	//A            7 6 5 4 3 2 1 0
@@ -2920,17 +2943,69 @@ void GB::RenderTile(bool unsig, ui16 tileMap, ui16 tileData, ui8 xPos, ui8 yPos,
 
 	int pixelIndex = pixel + (DISPLAY_WIDTH * line);
 	//Retrieve the colour values of the pixel from the pallette
-	pixelRGB colour = classicPallette[(pallette >> colourNum * 2) & 3];
+	pixelRGB colour = currentPallete[getColourFromPallette(pallette, colours(colourNum))];
 
-
-
-	//if (colourNum == LIGHT_GREY)
+	//if (DEBUGGING)
 	//{
-	//	std::cout << "hello" << std::endl;
+	//	if (colourNum == BLACK)
+	//	{
+	//		std::cout << "hello" << std::endl;
+	//	}
 	//}
+
 
 	//Store them in the framebuffer
 	frameBuffer[pixelIndex * 4] = colour.blue;
 	frameBuffer[pixelIndex * 4 + 1] = colour.green;
 	frameBuffer[pixelIndex * 4 + 2] = colour.red;
+}
+
+colours GB::getColourFromPallette(ui8 pallete, colours originalColour)
+{
+	ui8 colourNumber = 0;
+	switch (originalColour)
+	{
+	case WHITE:
+		if (HasBit(pallete, 1))
+		{
+			SetBit(colourNumber, 1);
+		}
+		if (HasBit(pallete, 0))
+		{
+			SetBit(colourNumber, 0);
+		}
+		break;
+	case LIGHT_GREY:
+		if (HasBit(pallete, 3))
+		{
+			SetBit(colourNumber, 1);
+		}
+		if (HasBit(pallete, 2))
+		{
+			SetBit(colourNumber, 0);
+		}
+		break;
+	case DARK_GREY:
+		if (HasBit(pallete, 5))
+		{
+			SetBit(colourNumber, 1);
+		}
+		if (HasBit(pallete, 4))
+		{
+			SetBit(colourNumber, 0);
+		}
+		break;
+	case BLACK:
+		if (HasBit(pallete, 7))
+		{
+			SetBit(colourNumber, 1);
+		}
+		if (HasBit(pallete, 6))
+		{
+			SetBit(colourNumber, 0);
+		}
+		break;
+	}
+
+	return colours(colourNumber);
 }
