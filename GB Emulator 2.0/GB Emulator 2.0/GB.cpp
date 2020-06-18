@@ -114,7 +114,7 @@ void GB::WriteData(ui16 address, ui8 data)
 		}
 		case 0xFF07: // Timer Control
 		{
-			// To do: Timer Control
+			SetTimerControl(data);
 			break;
 		}
 		case 0xFF40: // Video Control
@@ -139,7 +139,7 @@ void GB::WriteData(ui16 address, ui8 data)
 		}
 		case 0xFF46: // Transfer Sprites DMA
 		{
-			// To do: DMA transfer
+			DMATransfer(data);
 			break;
 		}
 		case 0xFF50: // Boot rom switch
@@ -204,10 +204,10 @@ void GB::WriteData(ui16 address, ui8 data)
 		return;
 	}
 
-	// Interrupt
+	// Interrupt https://www.reddit.com/r/EmuDev/comments/6sxb09/gb_tetris_stuck_at_copyright_screen/
 	if (address == 0xFFFF) // Low Frequancy
 	{
-		//m_bus[address] = data;
+		m_bus[address] = data;
 		return;
 	}
 
@@ -301,7 +301,7 @@ inline void GB::SetPC(const ui16& value)
 	dynamicPtr = &m_bus[value];
 }
 
-bool GB::HasBit(ui8 data, ui8 bit)
+bool GB::HasBit(ui8& data, ui8 bit)
 {
 	return (data >> bit) & 1;
 }
@@ -311,7 +311,7 @@ void GB::SetBit(ui8& data, ui8 bit)
 	data |= 0x1 << bit;
 }
 
-void GB::ClearBit(ui8 data, ui8 bit)
+void GB::ClearBit(ui8& data, ui8 bit)
 {
 	data &= ~(1 << bit);
 }
@@ -383,9 +383,10 @@ void GB::INCByteRegister(const ui8& reg) //Increments register and sets flags (Z
 
 	ClearFlags();
 
+	SetFlag(FLAG_CARRY, hasCarry);
+
 	GetByteRegister(reg)++;
 
-	SetFlag(FLAG_CARRY, hasCarry);
 	SetFlag(FLAG_ZERO, (reg) == 0);
 	SetFlag(FLAG_HALFCARRY, (GetByteRegister(reg) & 0x0F) == 0x00);
 
@@ -399,8 +400,6 @@ void GB::INCByteRegister(const ui8& reg) //Increments register and sets flags (Z
 void GB::DECByteRegister(const ui8& reg)
 {
 	GetByteRegister(reg)--;
-
-
 
 	if (!CheckFlag(FLAG_CARRY))
 	{
@@ -478,14 +477,15 @@ void GB::Bit(const ui8& value, ui8 bit)
 
 void GB::XOR(const ui8& value)
 {
-	ui8& result = GetByteRegister(A_REGISTER); //XOR the register to the value passed
-	result ^= value;
+	ui8 result = GetByteRegister(A_REGISTER) ^ value;
+
+	SetByteRegister(A_REGISTER, result);
 
 	ClearFlags();
 	SetFlag(FLAG_ZERO, (result == 0));
 }
 
-void GB::OR(const ui8 value)
+void GB::OR(const ui8& value)
 {
 	ui8 a = GetByteRegister(A_REGISTER);
 	ui8 result = a | value;
@@ -498,7 +498,7 @@ void GB::OR(const ui8 value)
 	SetFlag(FLAG_CARRY, false);
 }
 
-void GB::LDI(const ui16 address, const ui8& reg)
+void GB::LDI(const ui16& address, const ui8& reg)
 {
 	WriteData(address, GetByteRegister(reg));
 	GetWordRegister(HL_REGISTER)++;
@@ -593,10 +593,7 @@ void GB::RRC(ui8& reg, bool A)
 
 	if (!A)
 	{
-		if (!A)
-		{
-			SetFlag(FLAG_ZERO, (reg == 0));
-		}
+		SetFlag(FLAG_ZERO, (reg == 0));
 	}
 }
 
@@ -605,7 +602,6 @@ void GB::CP(const ui8& value)
 	ui8& reg = GetByteRegister(A_REGISTER); //store the old A value (A Remains unchanged)
 
 	SetFlag(FLAG_SUBTRACT, true);
-
 	SetFlag(FLAG_CARRY, reg < value);
 	SetFlag(FLAG_ZERO, reg == value);
 	SetFlag(FLAG_HALFCARRY, ((reg - value) & 0xF) > (reg & 0xF));
@@ -720,53 +716,90 @@ void GB::NextFrame()
 
 bool GB::TickCPU()
 {
-	CheckInterrupts();
-	OPCode = ReadNextCode();
+	cycle = 0;
 
-	cycle = (normalCycles[OPCode] * 4);
-	cycles += cycle;
+	if (halt)
+	{
+		cycle = 4;
 
-	int address1 = 0x2f1;
-	int address2 = 0x2F4;
+		if (m_haltDissableCycles > 0)
+		{
+			m_haltDissableCycles -= cycle;
 
-	if (OPCode == 0xCB) // Extra Codes
+			if (m_haltDissableCycles <= 0)
+			{
+				m_haltDissableCycles == 0;
+				halt = false;
+			}
+
+		}
+		else
+		{
+			ui8& interupt_flags = ReadData(m_cpu_interupt_flag_address);
+			ui8& interupt_enabled_flags = ReadData(m_interrupt_enabled_flag_address);
+
+			ui8 interuptsToProcess = interupt_flags & interupt_enabled_flags;
+
+			if (halt && interuptsToProcess > 0)
+			{
+				m_haltDissableCycles = 16;
+			}
+		}
+	}
+
+	if (!halt)
 	{
 		OPCode = ReadNextCode();
+		CheckInterrupts();
 
-		cycle = (CBCycles[OPCode] * 4);
+
+		cycle = (normalCycles[OPCode] * 4);
 		cycles += cycle;
 
-		(this->*CBCodes[OPCode])();
-		if (DEBUGGING)
+		int address1 = 0x100;
+		int address2 = 0x197;
+
+		if (OPCode == 0xCB) // Extra Codes
 		{
-			if (GetWordRegister(PC_REGISTER) >= address1 && GetWordRegister(PC_REGISTER) < address2 /*&& ReadData(LYRegister) > 0x8e*/)
+			OPCode = ReadNextCode();
+
+			cycle = (CBCycles[OPCode] * 4);
+			cycles += cycle;
+
+			(this->*CBCodes[OPCode])();
+			if (DEBUGGING)
 			{
+				if (GetWordRegister(PC_REGISTER) >= address1 /*&& GetWordRegister(PC_REGISTER) < address2 *//*&& ReadData(LYRegister) > 0x8e*/)
+				{
+					//OUTPUTCBREGISTERS(OPCode);
+					std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;
+				}
+
 				//OUTPUTCBREGISTERS(OPCode);
-				std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;
 			}
-			
-			//OUTPUTCBREGISTERS(OPCode);
-		}
 
-	}
-	else
-	{
-		(this->*BASECodes[OPCode])();
-		if (DEBUGGING)
+		}
+		else
 		{
-			if (GetWordRegister(PC_REGISTER) >= address1 && GetWordRegister(PC_REGISTER) < address2 /*&& ReadData(LYRegister) > 0x8e*/)
+			(this->*BASECodes[OPCode])();
+			if (DEBUGGING)
 			{
-				//OUTPUTREGISTERS(OPCode);
-				std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;
-			}
-			
-			//OUTPUTCBREGISTERS(OPCode);
-		}
+				if (GetWordRegister(PC_REGISTER) >= address1 /*&& GetWordRegister(PC_REGISTER) < address2*/ /*&& ReadData(LYRegister) > 0x8e*/)
+				{
+					//OUTPUTREGISTERS(OPCode);
+					std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;
+				}
 
+				//OUTPUTCBREGISTERS(OPCode);
+			}
+
+		}
 	}
+
+	
 	TickClock();
 	bool vSync = updatePixels();
-	//JoyPadTick();
+	JoyPadTick();
 	return vSync;
 }
 
@@ -834,6 +867,17 @@ void GB::ClockFrequency()
 	}
 }
 
+void GB::SetTimerControl(ui8 data)
+{
+	ui8 current = ReadData(m_timer_controll_address);
+	ReadData(m_timer_controll_address) = data;
+	ui8 new_data = ReadData(m_timer_controll_address);
+	if (new_data != current)
+	{
+		ClockFrequency();
+	}
+}
+
 void GB::RequestInterupt(CPUInterupt interupt)
 {
 	ReadData(m_cpu_interupt_flag_address) |= 1 << (ui8)interupt;
@@ -894,6 +938,9 @@ void GB::CheckInterrupts()
 						assert(0 && "Unqnown interupt");
 						break;
 					}
+
+					cycle += 20;
+
 					return;
 				}
 			}
@@ -911,7 +958,7 @@ void GB::CompareLYWithLYC()
 	ui8& controlBit = ReadData(lcdcRegister); // Get the LCDC register from the CPU
 	ui8& line = ReadData(LYRegister);
 
-	bool isDisplayEnabled = HasBit(lcdcRegister, 7);
+	bool isDisplayEnabled = HasBit(controlBit, 7);
 
 	if (isDisplayEnabled)
 	{
@@ -928,7 +975,7 @@ void GB::CompareLYWithLYC()
 		}
 		else
 		{
-			ClearBit(statusRegister, 2);
+			ClearBit(status, 2);
 		}
 	}
 }
@@ -1194,7 +1241,14 @@ void GB::OP72() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(D_REGI
 void GB::OP73() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(E_REGISTER)); }; // LD (HL), E
 void GB::OP74() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(H_REGISTER)); }; // LD (HL), H
 void GB::OP75() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(L_REGISTER)); }; // LD (HL), L
-void GB::OP76() {assert("Missing" && 0);}; // HALT
+void GB::OP76() 
+{
+	halt = true;
+
+	/* Check for halt bug */
+	ui8 interruptEnabledFlag = ReadData(m_interrupt_enabled_flag_address);
+	ui8 interruptFlag = ReadData(m_cpu_interupt_flag_address);
+}; // HALT
 void GB::OP77() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(A_REGISTER)); }; // LD (HL), A
 void GB::OP78() { SetByteRegister(A_REGISTER, GetByteRegister(B_REGISTER));}; // LD A, B
 void GB::OP79() { SetByteRegister(A_REGISTER, GetByteRegister(C_REGISTER));}; // LD A, C
@@ -1323,7 +1377,11 @@ void GB::OPCD()
 	SetPC(word); // Move to the address};
 } // CALL u16 (Push address of next instruction onto stack and then jump to address)
 void GB::OPCE() {assert("Missing" && 0);};
-void GB::OPCF() {assert("Missing" && 0);};
+void GB::OPCF() 
+{
+	PushStack(PC_REGISTER);
+	SetPC(RESET_08);
+};
 void GB::OPD0() {assert("Missing" && 0);};
 void GB::OPD1() { PopStack(DE_REGISTER); }; // POP DE
 void GB::OPD2() {assert("Missing" && 0);};
@@ -1359,7 +1417,11 @@ void GB::OPDC()
 }; // CALL C, u16
 void GB::OPDD() {assert("Invalid CPU Instruction" && 0);};
 void GB::OPDE() {assert("Missing" && 0);};
-void GB::OPDF() {assert("Missing" && 0);};
+void GB::OPDF() 
+{
+	PushStack(PC_REGISTER);
+	SetPC(RESET_18);
+}; //RST 18
 void GB::OPE0() { WriteData(static_cast<ui16> (0xFF00 + ReadByte()), GetByteRegister(A_REGISTER)); }; // LD (FF00+UI8), A
 void GB::OPE1() { PopStack(HL_REGISTER); }; // POP HL
 void GB::OPE2() { WriteData(static_cast<ui16> (0xFF00 + GetByteRegister(C_REGISTER)), GetByteRegister(A_REGISTER)); }; // LD (FF00 + C), A
@@ -1442,7 +1504,11 @@ void GB::OPFB()
 void GB::OPFC() { assert(0 && "Invalid CPU"); };
 void GB::OPFD() { assert(0 && "Invalid CPU"); };
 void GB::OPFE() { CP(ReadByte()); }; // CP, n
-void GB::OPFF() { assert("Missing" && 0); };
+void GB::OPFF() 
+{
+	PushStack(PC_REGISTER);
+	SetPC(RESET_38);
+}; // RST 38h 
 
 //CB OP CODES
 void GB::OPCB00() {assert("Missing" && 0);};
@@ -1525,52 +1591,52 @@ void GB::OPCB4C() {assert("Missing" && 0);};
 void GB::OPCB4D() {assert("Missing" && 0);};
 void GB::OPCB4E() {assert("Missing" && 0);};
 void GB::OPCB4F() {assert("Missing" && 0);};
-void GB::OPCB50() {assert("Missing" && 0);};
-void GB::OPCB51() {assert("Missing" && 0);};
-void GB::OPCB52() {assert("Missing" && 0);};
-void GB::OPCB53() {assert("Missing" && 0);};
-void GB::OPCB54() {assert("Missing" && 0);};
-void GB::OPCB55() {assert("Missing" && 0);};
+void GB::OPCB50() { Bit(GetByteRegister(B_REGISTER), 2); }; // BIT B, 2
+void GB::OPCB51() { Bit(GetByteRegister(C_REGISTER), 2); }; // BIT C, 2
+void GB::OPCB52() { Bit(GetByteRegister(D_REGISTER), 2); }; // BIT D, 2
+void GB::OPCB53() { Bit(GetByteRegister(E_REGISTER), 2); }; // BIT E, 2
+void GB::OPCB54() { Bit(GetByteRegister(H_REGISTER), 2); }; // BIT H, 2
+void GB::OPCB55() { Bit(GetByteRegister(L_REGISTER), 2); }; // BIT L, 2
 void GB::OPCB56() {assert("Missing" && 0);};
 void GB::OPCB57() {assert("Missing" && 0);};
-void GB::OPCB58() {assert("Missing" && 0);};
-void GB::OPCB59() {assert("Missing" && 0);};
-void GB::OPCB5A() {assert("Missing" && 0);};
-void GB::OPCB5B() {assert("Missing" && 0);};
-void GB::OPCB5C() {assert("Missing" && 0);};
-void GB::OPCB5D() {assert("Missing" && 0);};
-void GB::OPCB5E() {assert("Missing" && 0);};
-void GB::OPCB5F() {assert("Missing" && 0);};
-void GB::OPCB60() {assert("Missing" && 0);};
-void GB::OPCB61() {assert("Missing" && 0);};
-void GB::OPCB62() {assert("Missing" && 0);};
-void GB::OPCB63() {assert("Missing" && 0);};
-void GB::OPCB64() {assert("Missing" && 0);};
-void GB::OPCB65() {assert("Missing" && 0);};
-void GB::OPCB66() {assert("Missing" && 0);};
-void GB::OPCB67() {assert("Missing" && 0);};
-void GB::OPCB68() {assert("Missing" && 0);};
-void GB::OPCB69() {assert("Missing" && 0);};
-void GB::OPCB6A() {assert("Missing" && 0);};
-void GB::OPCB6B() {assert("Missing" && 0);};
-void GB::OPCB6C() {assert("Missing" && 0);};
-void GB::OPCB6D() {assert("Missing" && 0);};
-void GB::OPCB6E() {assert("Missing" && 0);};
-void GB::OPCB6F() {assert("Missing" && 0);};
-void GB::OPCB70() {assert("Missing" && 0);};
-void GB::OPCB71() {assert("Missing" && 0);};
-void GB::OPCB72() {assert("Missing" && 0);};
-void GB::OPCB73() {assert("Missing" && 0);};
-void GB::OPCB74() {assert("Missing" && 0);};
-void GB::OPCB75() {assert("Missing" && 0);};
+void GB::OPCB58() { Bit(GetByteRegister(B_REGISTER), 3); }; // BIT B, 3
+void GB::OPCB59() { Bit(GetByteRegister(C_REGISTER), 3); }; // BIT C, 3
+void GB::OPCB5A() { Bit(GetByteRegister(D_REGISTER), 3); }; // BIT D, 3
+void GB::OPCB5B() { Bit(GetByteRegister(E_REGISTER), 3); }; // BIT E, 3
+void GB::OPCB5C() { Bit(GetByteRegister(H_REGISTER), 3); }; // BIT H, 3
+void GB::OPCB5D() { Bit(GetByteRegister(L_REGISTER), 3); }; // BIT L, 3
+void GB::OPCB5E() { assert("Missing" && 0); }; 
+void GB::OPCB5F() { Bit(GetByteRegister(A_REGISTER), 3); }; // BIT A, 3
+void GB::OPCB60() { Bit(GetByteRegister(B_REGISTER), 3); }; // BIT B, 4
+void GB::OPCB61() { Bit(GetByteRegister(C_REGISTER), 3); }; // BIT C, 4
+void GB::OPCB62() { Bit(GetByteRegister(D_REGISTER), 3); }; // BIT D, 4
+void GB::OPCB63() { Bit(GetByteRegister(E_REGISTER), 3); }; // BIT E, 4
+void GB::OPCB64() { Bit(GetByteRegister(H_REGISTER), 3); }; // BIT H, 4
+void GB::OPCB65() { Bit(GetByteRegister(L_REGISTER), 3); }; // BIT L, 4
+void GB::OPCB66() { assert("Missing" && 0); };
+void GB::OPCB67() { Bit(GetByteRegister(A_REGISTER), 4); }; // BIT A, 4
+void GB::OPCB68() { assert("Missing" && 0); };
+void GB::OPCB69() { assert("Missing" && 0); };
+void GB::OPCB6A() { assert("Missing" && 0); };
+void GB::OPCB6B() { assert("Missing" && 0); };
+void GB::OPCB6C() { assert("Missing" && 0); };
+void GB::OPCB6D() { assert("Missing" && 0); };
+void GB::OPCB6E() { assert("Missing" && 0); };
+void GB::OPCB6F() { Bit(GetByteRegister(A_REGISTER), 5); }; // BIT A, 5
+void GB::OPCB70() { Bit(GetByteRegister(B_REGISTER), 6); }; // BIT B, 6
+void GB::OPCB71() { Bit(GetByteRegister(C_REGISTER), 6); }; // BIT C, 6
+void GB::OPCB72() { Bit(GetByteRegister(D_REGISTER), 6); }; // BIT D, 6
+void GB::OPCB73() { Bit(GetByteRegister(E_REGISTER), 6); }; // BIT E, 6
+void GB::OPCB74() { Bit(GetByteRegister(H_REGISTER), 6); }; // BIT H, 6
+void GB::OPCB75() { Bit(GetByteRegister(L_REGISTER), 6); }; // BIT L, 6
 void GB::OPCB76() {assert("Missing" && 0);};
-void GB::OPCB77() {assert("Missing" && 0);};
-void GB::OPCB78() {assert("Missing" && 0);};
-void GB::OPCB79() {assert("Missing" && 0);};
-void GB::OPCB7A() {assert("Missing" && 0);};
-void GB::OPCB7B() {assert("Missing" && 0);};
-void GB::OPCB7C() { Bit(GetByteRegister(H_REGISTER), 7); };
-void GB::OPCB7D() {assert("Missing" && 0);};
+void GB::OPCB77() { Bit(GetByteRegister(A_REGISTER), 6); }; // BIT A, 6
+void GB::OPCB78() { Bit(GetByteRegister(B_REGISTER), 7); }; // BIT B, 7
+void GB::OPCB79() { Bit(GetByteRegister(C_REGISTER), 7); };	// BIT C, 7
+void GB::OPCB7A() { Bit(GetByteRegister(D_REGISTER), 7); };	// BIT D, 7
+void GB::OPCB7B() { Bit(GetByteRegister(E_REGISTER), 7); };	// BIT E, 7
+void GB::OPCB7C() { Bit(GetByteRegister(H_REGISTER), 7); };	// BIT H, 7
+void GB::OPCB7D() { Bit(GetByteRegister(L_REGISTER), 7); };	// BIT L, 7
 void GB::OPCB7E() {assert("Missing" && 0);};
 void GB::OPCB7F() {assert("Missing" && 0);};
 void GB::OPCB80() {assert("Missing" && 0);};
@@ -2446,7 +2512,7 @@ bool GB::createSDLWindow()
 
 	SDL_Init(SDL_INIT_VIDEO);
 
-	window = SDL_CreateWindow("CrosBOY", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, DISPLAY_WIDTH * 3, DISPLAY_HEIGHT * 3, SDL_WINDOW_ALLOW_HIGHDPI);
+	window = SDL_CreateWindow("CrosBOY", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, DISPLAY_WIDTH * windowMultiplier, DISPLAY_HEIGHT * windowMultiplier, SDL_WINDOW_ALLOW_HIGHDPI);
 
 	render = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
@@ -2835,11 +2901,13 @@ void GB::RenderSprites()
 		//Sprite Attributes
 		ui8 attributes = ReadData(0xFE00 + index + 3);
 		ui16 pallette = HasBit(attributes, 4) ? 0xFF49 : 0xFF48;
+		ui8 backgroundPallette = ReadData(0xFF47);
+		pixelRGB backgroundZeroColour = currentPallete[getColourFromPallette(backgroundPallette, WHITE)];
 		bool xFlip = HasBit(attributes, 5);
 		bool yFlip = HasBit(attributes, 6);
 		bool spriteOnTop = !HasBit(attributes, 7);
 
-		if ((line >= yPos) && (line < (yPos + spriteHeight)))
+		if ((line >= yPos) && (line < (yPos + spriteHeight))) // TODO: not breaking into this statement to draw the sprites
 		{
 			int spriteLine = line - yPos;
 
@@ -2873,15 +2941,15 @@ void GB::RenderSprites()
 						position *= -1;
 					}
 
-					colourNum = (ui8)(lower >> position) & 1; // Get the set bit
+					colourNum = (lower >> position) & 1; // Get the set bit
 					colourNum <<= 1;
-					colourNum |= (ui8)(upper >> position) & 1;
+					colourNum |= (upper >> position) & 1;
 
 					if (colourNum != WHITE) // Don't need to draw clear tiles
 					{
 						int pixelIndex = pixel + (DISPLAY_WIDTH * line);
 						//TODO: check if the sprite is on top
-						pixelRGB colour = classicPallette[(pallette >> colourNum * 2) & 3];
+						pixelRGB colour = classicPallette[(pallette, colours(colourNum))];
 						//Store them in the framebuffer
 						frameBuffer[pixelIndex * 4] = colour.blue;
 						frameBuffer[pixelIndex * 4 + 1] = colour.green;
@@ -3008,4 +3076,14 @@ colours GB::getColourFromPallette(ui8 pallete, colours originalColour)
 	}
 
 	return colours(colourNumber);
+}
+
+void GB::DMATransfer(const ui8 data)
+{
+	// Sprite Data is at data * 100
+	ui16 address = data << 8;
+	for (int i = 0; i < 0xA0; i++)
+	{
+		WriteData(0xFE00 + i, ReadData(address + i));
+	}
 }

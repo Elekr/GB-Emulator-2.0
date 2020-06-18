@@ -1,7 +1,4 @@
 ﻿  GB.cpp
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(919,48): warning C4305: 'argument': truncation from 'const int' to 'ui8'
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(919,33): warning C4309: 'argument': truncation of constant value
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(936,30): warning C4305: 'argument': truncation from 'const int' to 'ui8'
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(936,13): warning C4309: 'argument': truncation of constant value
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(1311,6): warning C4244: 'argument': conversion from 'ui16' to 'const ui8', possible loss of data
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(731,26): warning C4553: '==': result of expression not used; did you intend '='?
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(1360,6): warning C4244: 'argument': conversion from 'ui16' to 'const ui8', possible loss of data
   GB Emulator 2.0.vcxproj -> C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\Debug\GB Emulator 2.0.exe

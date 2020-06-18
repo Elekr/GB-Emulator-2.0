@@ -3,13 +3,16 @@
 #include "SDL.h"
 #include <iostream>
 #include <string>
+#include "Cartridge.h"
 
 typedef unsigned __int8 ui8; //8-bit Integer
 typedef signed __int8 i8;
 typedef unsigned __int16 ui16; //16-bit Integer
 typedef signed __int16 i16;
 
-#include "Cartridge.h"
+
+
+const int windowMultiplier = 4;
 
 const int A_REGISTER = 0;
 const int F_REGISTER = 1;
@@ -246,6 +249,9 @@ public:
 
     //**** Interrupts
     bool interruptsEnabled = false;
+
+    //**** HALT
+    int m_haltDissableCycles;
     bool halt = false;
 
     GB();
@@ -272,9 +278,9 @@ public:
     inline void SetPC(const ui16& value); //////
 
     //**** BITS
-    bool HasBit(ui8 data, ui8 bit); //used for the Display potentially can change check flag around 
+    bool HasBit(ui8& data, ui8 bit); //used for the Display potentially can change check flag around 
     void SetBit(ui8& data, ui8 bit);
-    void ClearBit(ui8 data, ui8 bit);
+    void ClearBit(ui8& data, ui8 bit);
 
     inline void PushStack(ui8 reg);
     inline void PopStack(ui8 reg);
@@ -299,9 +305,9 @@ public:
 
     void XOR(const ui8& value);
 
-    void OR(const ui8 value);
+    void OR(const ui8& value);
 
-    void LDI(const ui16 address, const ui8& reg); // https://github.com/jgilchrist/gbemu/blob/master/src/cpu/opcodes.cc
+    void LDI(const ui16& address, const ui8& reg); // https://github.com/jgilchrist/gbemu/blob/master/src/cpu/opcodes.cc
 
     void LDI(const ui8& reg, const ui16& address);
 
@@ -325,7 +331,7 @@ public:
 
     void AND(const ui8& value);
 
-    //CB
+    //****CB
 
     void Swap(ui8& value);
 
@@ -343,6 +349,7 @@ public:
     bool TickCPU();
     void TickClock();
     void ClockFrequency();
+    void SetTimerControl(ui8 data); 
 
     void InitOPArray();
     void InitCBOPArray();
@@ -364,7 +371,7 @@ public:
     SDL_Window* window;
     SDL_Renderer* render;
     SDL_Texture* screen_texture;
-    pixelRGB* currentPallete = classicPallette;
+    pixelRGB* currentPallete = greyPallette;
     pixelRGB classicPallette[4] = { { 155,188,15 }, { 139,172,15 }, { 48,98,48 }, { 15,56,15 } };
     pixelRGB greyPallette[4] = { { 255,255,255 },{ 0xCC,0xCC,0xCC },{ 0x77,0x77,0x77 }, { 0x0,0x0,0x0 } };
 
@@ -402,6 +409,8 @@ public:
     void RenderSprites();
     void RenderTile(bool unsig, ui16 tileMap, ui16 tileData, ui8 xPos, ui8 yPos, ui8 pixel, ui8 pallette);
     colours getColourFromPallette(ui8 pallete, colours originalColour);
+
+    void DMATransfer(const ui8 data);
 
     void RequestInterupt(CPUInterupt interupt); //Handle interupt requests 
     void UpdateLCDStatus();
