@@ -335,6 +335,8 @@ public:
 
     void Swap(ui8& value);
 
+    void SRL(ui8& value);
+
     typedef void(GB::*OPCodePtr)(void); // generic function pointer for every code
     OPCodePtr BASECodes[256];
     OPCodePtr CBCodes[256];

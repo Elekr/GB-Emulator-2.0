@@ -154,7 +154,7 @@ void GB::WriteData(ui16 address, ui8 data)
 				else
 				{
 					std::cout << "Booted Successfully" << std::endl;
-					DEBUGGING = true;
+					//DEBUGGING = true;
 				/*	std::cout << std::hex << (int)m_bus[0x2f0] << std::endl;*/
 
 					//ui8* cartridgeMemory = m_cartridge.GetRawData();
@@ -236,6 +236,7 @@ bool GB::InMemoryRange(ui16 start, ui16 end, ui16 address)
 ui8 GB::ReadByte()
 {
 	ui8 byte = *dynamicPtr; //Gets the byte that the pointer is currently at
+	cycle += 4;
 	IncrementPC(); //Move along the pointer
 	return byte;
 }
@@ -284,6 +285,7 @@ void GB::SetWordRegister(ui8 reg, ui16 value)
 ui8 GB::ReadNextCode()
 {
 	ui8 result = *dynamicPtr;
+	cycle += 4;
 	IncrementPC();
 	//TODO: HALT BUG STUFF
 	return result;
@@ -291,7 +293,7 @@ ui8 GB::ReadNextCode()
 
 void GB::IncrementPC()
 {
-	SetWordRegister(PC_REGISTER, GetWordRegister(PC_REGISTER) + 1); //Increments the PC register by 1
+	GetWordRegister(PC_REGISTER)++; //Increments the PC register by 1
 	dynamicPtr++; //Moves the busPtr along one
 }
 
@@ -299,6 +301,8 @@ inline void GB::SetPC(const ui16& value)
 {
 	register16bit[PC_REGISTER] = value;
 	dynamicPtr = &m_bus[value];
+
+	cycle += 4;
 }
 
 bool GB::HasBit(ui8& data, ui8 bit)
@@ -334,6 +338,8 @@ void GB::PushStack(ui8 reg)
 	WriteData(GetWordRegister(SP_REGISTER), highByte);
 	GetWordRegister(SP_REGISTER)--;
 	WriteData(GetWordRegister(SP_REGISTER), lowByte);
+
+	cycle += 8;
 }
 
 void GB::PopStack(ui8 reg)
@@ -355,6 +361,7 @@ void GB::PopStack(ui8 reg)
 	GetWordRegister(SP_REGISTER)++;
 	SetWordRegister(reg, word);
 
+	cycle += 8;
 }
 
 void GB::PopStackPC()
@@ -374,7 +381,9 @@ void GB::PopStackPC()
 	GetWordRegister(SP_REGISTER)++;
 	SetWordRegister(PC_REGISTER, data);
 
-	dynamicPtr = &m_bus[data];
+	cycle += 8;
+
+	SetPC(data);
 }
 
 void GB::INCByteRegister(const ui8& reg) //Increments register and sets flags (Z, S, H)
@@ -387,7 +396,7 @@ void GB::INCByteRegister(const ui8& reg) //Increments register and sets flags (Z
 
 	GetByteRegister(reg)++;
 
-	SetFlag(FLAG_ZERO, (reg) == 0);
+	SetFlag(FLAG_ZERO, GetByteRegister(reg) == 0);
 	SetFlag(FLAG_HALFCARRY, (GetByteRegister(reg) & 0x0F) == 0x00);
 
 	//http://www.z80.info/z80syntx.htm#INC <- helpful information on INC
@@ -425,7 +434,7 @@ void GB::SetFlag(int flag, bool value)
 
 bool GB::CheckFlag(int flag)
 {
-	return(GetByteRegister(F_REGISTER) >> flag) & 1; // Shift the number to the right then AND mask it to 1
+	return HasBit(GetByteRegister(F_REGISTER), flag); // Shift the number to the right then AND mask it to 1
 }
 
 void GB::ClearFlags() /////////
@@ -466,6 +475,8 @@ void GB::ADDHL(const ui16& reg)
 	}
 
 	SetWordRegister(HL_REGISTER, static_cast<ui16>(result));
+
+	cycle += 4;
 }
 
 void GB::Bit(const ui8& value, ui8 bit)
@@ -502,6 +513,8 @@ void GB::LDI(const ui16& address, const ui8& reg)
 {
 	WriteData(address, GetByteRegister(reg));
 	GetWordRegister(HL_REGISTER)++;
+
+	cycle += 4;
 }
 
 void GB::LDI(const ui8& reg, const ui16& address)
@@ -599,7 +612,7 @@ void GB::RRC(ui8& reg, bool A)
 
 void GB::CP(const ui8& value)
 {
-	ui8& reg = GetByteRegister(A_REGISTER); //store the old A value (A Remains unchanged)
+	ui8 reg = GetByteRegister(A_REGISTER);
 
 	SetFlag(FLAG_SUBTRACT, true);
 	SetFlag(FLAG_CARRY, reg < value);
@@ -707,6 +720,17 @@ void GB::Swap(ui8& value)
 	SetFlag(FLAG_SUBTRACT, false);
 }
 
+void GB::SRL(ui8& value)
+{
+	ClearFlags();
+	if ((value & 0x01) != 0)
+	{
+		SetFlag(FLAG_CARRY, true);
+	}
+	value >>= 1;
+	SetFlag(FLAG_ZERO, value == 0);
+}
+
 void GB::NextFrame()
 {
 	while(!TickCPU());
@@ -756,8 +780,8 @@ bool GB::TickCPU()
 		cycle = (normalCycles[OPCode] * 4);
 		cycles += cycle;
 
-		int address1 = 0x100;
-		int address2 = 0x197;
+		int address1 = 0xc3Ae;
+		int address2 = 0xc7D2;
 
 		if (OPCode == 0xCB) // Extra Codes
 		{
@@ -769,11 +793,12 @@ bool GB::TickCPU()
 			(this->*CBCodes[OPCode])();
 			if (DEBUGGING)
 			{
-				if (GetWordRegister(PC_REGISTER) >= address1 /*&& GetWordRegister(PC_REGISTER) < address2 *//*&& ReadData(LYRegister) > 0x8e*/)
+				if (GetWordRegister(PC_REGISTER) >= address1 && GetWordRegister(PC_REGISTER) <= address2)
 				{
-					//OUTPUTCBREGISTERS(OPCode);
+					OUTPUTCBREGISTERS(OPCode);
 					std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;
 				}
+
 
 				//OUTPUTCBREGISTERS(OPCode);
 			}
@@ -784,9 +809,9 @@ bool GB::TickCPU()
 			(this->*BASECodes[OPCode])();
 			if (DEBUGGING)
 			{
-				if (GetWordRegister(PC_REGISTER) >= address1 /*&& GetWordRegister(PC_REGISTER) < address2*/ /*&& ReadData(LYRegister) > 0x8e*/)
+				if (GetWordRegister(PC_REGISTER) >= address1 && GetWordRegister(PC_REGISTER) <= address2)
 				{
-					//OUTPUTREGISTERS(OPCode);
+					OUTPUTREGISTERS(OPCode);
 					std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;
 				}
 
@@ -983,8 +1008,8 @@ void GB::CompareLYWithLYC()
 //OP CODES
 void GB::OP00() {}; // NOP
 void GB::OP01() { SetWordRegister(BC_REGISTER, ReadWord()); }; // LD BC, nn 
-void GB::OP02() { WriteData(GetWordRegister(BC_REGISTER), GetByteRegister(A_REGISTER)); }; // LD (BC), A
-void GB::OP03() { GetWordRegister(BC_REGISTER)++; }; // INC BC
+void GB::OP02() { WriteData(GetWordRegister(BC_REGISTER), GetByteRegister(A_REGISTER));  cycle += 4; }; // LD (BC), A
+void GB::OP03() { GetWordRegister(BC_REGISTER)++; cycle += 4; }; // INC BC
 void GB::OP04() { INCByteRegister(B_REGISTER); }; // INC B
 void GB::OP05() { DECByteRegister(B_REGISTER); }; // DEC B
 void GB::OP06() { SetByteRegister(B_REGISTER, ReadByte()); }; // LD B, ui8
@@ -1003,29 +1028,29 @@ void GB::OP08()
 		};
 	};
 	data = GetWordRegister(SP_REGISTER);
-
+	cycle += 8;
 	WriteData(pc, low);
 	WriteData(pc + 1, high);
 }; // LD (nn) SP
 void GB::OP09() { ADDHL(GetWordRegister(BC_REGISTER)); }; // ADD HL, BC
-void GB::OP0A() { SetByteRegister(A_REGISTER, ReadData(GetWordRegister(BC_REGISTER))); }; // LD A, (BC)
-void GB::OP0B() { GetWordRegister(BC_REGISTER)--; }; // DEC BC
+void GB::OP0A() { SetByteRegister(A_REGISTER, ReadData(GetWordRegister(BC_REGISTER)));  cycle += 4; }; // LD A, (BC)
+void GB::OP0B() { GetWordRegister(BC_REGISTER)--; cycle += 4; }; // DEC BC
 void GB::OP0C() { INCByteRegister(C_REGISTER); }; // INC C
 void GB::OP0D() { DECByteRegister(C_REGISTER); }; // DEC C
 void GB::OP0E() { SetByteRegister(C_REGISTER, ReadByte()); }; // LD C, ui8
 void GB::OP0F() { RRC(GetByteRegister(A_REGISTER), true); }; // RRCA
 void GB::OP10() { IncrementPC(); }; // STOP (does nothing unless gbc)
 void GB::OP11() { SetWordRegister(DE_REGISTER, ReadWord()); }; // LD DE, nn
-void GB::OP12() { WriteData(GetWordRegister(DE_REGISTER), GetByteRegister(A_REGISTER)); }; // LD (DE), A
-void GB::OP13() { GetWordRegister(DE_REGISTER)++; }; // INC DE
+void GB::OP12() { WriteData(GetWordRegister(DE_REGISTER), GetByteRegister(A_REGISTER)); cycle += 4; }; // LD (DE), A
+void GB::OP13() { GetWordRegister(DE_REGISTER)++; cycle += 4; }; // INC DE
 void GB::OP14() { INCByteRegister(D_REGISTER); }; // INC D
 void GB::OP15() { DECByteRegister(D_REGISTER); }; // DEC D
 void GB::OP16() { SetByteRegister(D_REGISTER, ReadByte()); }; // LD D, ui8
 void GB::OP17() { RL(GetByteRegister(A_REGISTER), true); }; // RLA
 void GB::OP18() { Jr(); }; // Jr i8
 void GB::OP19() { ADDHL(GetWordRegister(DE_REGISTER)); }; // ADD HL, DE
-void GB::OP1A() { SetByteRegister(A_REGISTER, ReadData(GetWordRegister(DE_REGISTER))); }; // LD A, (DE)
-void GB::OP1B() { GetWordRegister(DE_REGISTER)++; }; // DEC DE
+void GB::OP1A() { SetByteRegister(A_REGISTER, ReadData(GetWordRegister(DE_REGISTER))); cycle += 4; }; // LD A, (DE)
+void GB::OP1B() { GetWordRegister(DE_REGISTER)++; cycle += 4; }; // DEC DE
 void GB::OP1C() { INCByteRegister(E_REGISTER); }; // INC E
 void GB::OP1D() { DECByteRegister(E_REGISTER); }; // DEC E
 void GB::OP1E() { SetByteRegister(E_REGISTER, ReadByte()); }; // LD E, ui8
@@ -1043,7 +1068,7 @@ void GB::OP20()
 }; // JR NZ, i8 
 void GB::OP21() { SetWordRegister(HL_REGISTER, ReadWord()); }; // LD HL, nn
 void GB::OP22() { LDI(GetWordRegister(HL_REGISTER), A_REGISTER); }; // LD (HL+), A
-void GB::OP23() { GetWordRegister(HL_REGISTER)++; }; // INC HL
+void GB::OP23() { GetWordRegister(HL_REGISTER)++; cycle += 4; }; // INC HL
 void GB::OP24() { INCByteRegister(H_REGISTER); }; // INC H
 void GB::OP25() { DECByteRegister(H_REGISTER); }; // DEC H
 void GB::OP26() { SetByteRegister(H_REGISTER, ReadByte()); }; // LD H, ui8
@@ -1090,8 +1115,8 @@ void GB::OP28()
 	}
 }; // JR Z, i8
 void GB::OP29() { ADDHL(GetWordRegister(HL_REGISTER)); }; // ADD HL, HL
-void GB::OP2A() { LDI(A_REGISTER, GetWordRegister(HL_REGISTER)); }; // LD A, (HL+)
-void GB::OP2B() { GetWordRegister(HL_REGISTER)--; }; // DEC HL
+void GB::OP2A() { LDI(A_REGISTER, GetWordRegister(HL_REGISTER)); cycle += 4; }; // LD A, (HL+)
+void GB::OP2B() { GetWordRegister(HL_REGISTER)--; cycle += 4; }; // DEC HL
 void GB::OP2C() { INCByteRegister(L_REGISTER); }; // INC L
 void GB::OP2D() { DECByteRegister(L_REGISTER); }; // DEC L
 void GB::OP2E() { SetByteRegister(L_REGISTER, ReadByte()); }; // LD L, ui8
@@ -1118,8 +1143,9 @@ void GB::OP32()
 {
 	WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(A_REGISTER));
 	GetWordRegister(HL_REGISTER)--;
+	cycle += 4;
 }; // LD (HL--), A https://blog.tigris.fr/2019/07/28/writing-an-emulator-memory-management/
-void GB::OP33() { GetWordRegister(SP_REGISTER)--; }; // INC SP
+void GB::OP33() { GetWordRegister(SP_REGISTER)++;  cycle += 4; }; // INC SP
 void GB::OP34() 
 {
 	ui8 byte = ReadData(HL_REGISTER); // store the data
@@ -1133,6 +1159,8 @@ void GB::OP34()
 	SetFlag(FLAG_CARRY, hasCarry);
 	SetFlag(FLAG_ZERO, byte == 0);
 	SetFlag(FLAG_HALFCARRY, (byte & 0x0F) == 0x00);
+
+	cycle += 8;
 
 }; // INC (HL)
 void GB::OP35()
@@ -1150,8 +1178,10 @@ void GB::OP35()
 	SetFlag(FLAG_SUBTRACT, true);
 	SetFlag(FLAG_HALFCARRY, (data & 0x0F) == 0x0F);
 
+	cycle += 8;
+
 } // return data back}; // DEC (HL)
-void GB::OP36() { WriteData(GetWordRegister(HL_REGISTER), ReadByte()); }; // LD (HL) ui8
+void GB::OP36() { WriteData(GetWordRegister(HL_REGISTER), ReadByte()); cycle += 4; }; // LD (HL) ui8
 void GB::OP37() 
 {
 	SetFlag(FLAG_CARRY, true);
@@ -1175,8 +1205,9 @@ void GB::OP3A()
 {
 	SetByteRegister(A_REGISTER, ReadData(GetWordRegister(HL_REGISTER)));
 	GetWordRegister(HL_REGISTER)--;
+	cycle += 4;
 }; // LD A, (HL-)
-void GB::OP3B() { GetWordRegister(SP_REGISTER)--; }; // DEC SP
+void GB::OP3B() { GetWordRegister(SP_REGISTER)--; cycle += 4; }; // DEC SP
 void GB::OP3C() { INCByteRegister(A_REGISTER); }; // INC A
 void GB::OP3D() { DECByteRegister(A_REGISTER); }; // DEC A
 void GB::OP3E() { SetByteRegister(A_REGISTER, ReadByte()); }; // LD A, ui8
@@ -1193,7 +1224,7 @@ void GB::OP42() { SetByteRegister(B_REGISTER, GetByteRegister(D_REGISTER)); }; /
 void GB::OP43() { SetByteRegister(B_REGISTER, GetByteRegister(E_REGISTER)); }; // LD B, E
 void GB::OP44() { SetByteRegister(B_REGISTER, GetByteRegister(H_REGISTER)); }; // LD B, H
 void GB::OP45() { SetByteRegister(B_REGISTER, GetByteRegister(L_REGISTER)); }; // LD B, L
-void GB::OP46() { SetByteRegister(B_REGISTER, ReadData(GetWordRegister(HL_REGISTER))); }; // LD B, HL
+void GB::OP46() { SetByteRegister(B_REGISTER, ReadData(GetWordRegister(HL_REGISTER))); cycle += 4; }; // LD B, HL
 void GB::OP47() { SetByteRegister(B_REGISTER, GetByteRegister(A_REGISTER)); }; // LD B, A
 void GB::OP48() { SetByteRegister(C_REGISTER, GetByteRegister(B_REGISTER)); }; // LD C, B
 void GB::OP49() { SetByteRegister(C_REGISTER, GetByteRegister(C_REGISTER)); }; // LD C, C
@@ -1201,7 +1232,7 @@ void GB::OP4A() { SetByteRegister(C_REGISTER, GetByteRegister(D_REGISTER)); }; /
 void GB::OP4B() { SetByteRegister(C_REGISTER, GetByteRegister(E_REGISTER)); }; // LD C, E
 void GB::OP4C() { SetByteRegister(C_REGISTER, GetByteRegister(H_REGISTER)); }; // LD C, H
 void GB::OP4D() { SetByteRegister(C_REGISTER, GetByteRegister(L_REGISTER)); }; // LD C, L
-void GB::OP4E() { SetByteRegister(C_REGISTER, ReadData(GetWordRegister(HL_REGISTER))); }; // LD C, HL
+void GB::OP4E() { SetByteRegister(C_REGISTER, ReadData(GetWordRegister(HL_REGISTER))); cycle += 4; }; // LD C, HL
 void GB::OP4F() { SetByteRegister(C_REGISTER, GetByteRegister(A_REGISTER)); }; // LD C, A
 void GB::OP50() { SetByteRegister(D_REGISTER, GetByteRegister(B_REGISTER)); }; // LD D,B
 void GB::OP51() { SetByteRegister(D_REGISTER, GetByteRegister(C_REGISTER)); }; // LD D,C
@@ -1209,7 +1240,7 @@ void GB::OP52() { SetByteRegister(D_REGISTER, GetByteRegister(D_REGISTER)); }; /
 void GB::OP53() { SetByteRegister(D_REGISTER, GetByteRegister(E_REGISTER)); }; // LD D,E
 void GB::OP54() { SetByteRegister(D_REGISTER, GetByteRegister(H_REGISTER)); }; // LD D,H
 void GB::OP55() { SetByteRegister(D_REGISTER, GetByteRegister(L_REGISTER)); }; // LD D,L
-void GB::OP56() { SetByteRegister(D_REGISTER, ReadData(GetWordRegister(HL_REGISTER))); }; // LD D, (HL)
+void GB::OP56() { SetByteRegister(D_REGISTER, ReadData(GetWordRegister(HL_REGISTER))); cycle += 4; }; // LD D, (HL)
 void GB::OP57() { SetByteRegister(D_REGISTER, GetByteRegister(A_REGISTER)); }; //LD D, A
 void GB::OP58() { SetByteRegister(E_REGISTER, GetByteRegister(B_REGISTER)); }; // LD E, B
 void GB::OP59() { SetByteRegister(E_REGISTER, GetByteRegister(C_REGISTER)); }; // LD E, C
@@ -1217,7 +1248,7 @@ void GB::OP5A() { SetByteRegister(E_REGISTER, GetByteRegister(D_REGISTER)); }; /
 void GB::OP5B() { SetByteRegister(E_REGISTER, GetByteRegister(E_REGISTER)); }; // LD E, E
 void GB::OP5C() { SetByteRegister(E_REGISTER, GetByteRegister(H_REGISTER)); }; // LD E, H
 void GB::OP5D() { SetByteRegister(E_REGISTER, GetByteRegister(L_REGISTER)); }; // LD E, L
-void GB::OP5E() { SetByteRegister(E_REGISTER, ReadData(GetWordRegister(HL_REGISTER))); }; // LD E, (HL)
+void GB::OP5E() { SetByteRegister(E_REGISTER, ReadData(GetWordRegister(HL_REGISTER))); cycle += 4; }; // LD E, (HL)
 void GB::OP5F() { SetByteRegister(E_REGISTER, GetByteRegister(A_REGISTER)); }; // LD E, A
 void GB::OP60() { SetByteRegister(H_REGISTER, GetByteRegister(B_REGISTER)); }; // LD H, B
 void GB::OP61() { SetByteRegister(H_REGISTER, GetByteRegister(C_REGISTER)); }; // LD H, C
@@ -1225,7 +1256,7 @@ void GB::OP62() { SetByteRegister(H_REGISTER, GetByteRegister(D_REGISTER)); }; /
 void GB::OP63() { SetByteRegister(H_REGISTER, GetByteRegister(E_REGISTER)); }; // LD H, E
 void GB::OP64() { SetByteRegister(H_REGISTER, GetByteRegister(H_REGISTER)); }; // LD H, H
 void GB::OP65() { SetByteRegister(H_REGISTER, GetByteRegister(L_REGISTER)); }; // LD H, L
-void GB::OP66() { SetByteRegister(H_REGISTER, ReadData(GetWordRegister(HL_REGISTER))); }; // LD H, (HL)
+void GB::OP66() { SetByteRegister(H_REGISTER, ReadData(GetWordRegister(HL_REGISTER))); cycle += 4; }; // LD H, (HL)
 void GB::OP67() { SetByteRegister(H_REGISTER, GetByteRegister(A_REGISTER)); }; // LD H, A
 void GB::OP68() { SetByteRegister(L_REGISTER, GetByteRegister(B_REGISTER)); }; // LD L, B
 void GB::OP69() { SetByteRegister(L_REGISTER, GetByteRegister(C_REGISTER)); }; // LD L, C
@@ -1233,14 +1264,14 @@ void GB::OP6A() { SetByteRegister(L_REGISTER, GetByteRegister(D_REGISTER)); }; /
 void GB::OP6B() { SetByteRegister(L_REGISTER, GetByteRegister(E_REGISTER)); }; // LD L, E
 void GB::OP6C() { SetByteRegister(L_REGISTER, GetByteRegister(H_REGISTER)); }; // LD L, H
 void GB::OP6D() { SetByteRegister(L_REGISTER, GetByteRegister(L_REGISTER)); }; // LD L, L
-void GB::OP6E() { SetByteRegister(L_REGISTER, ReadData(GetWordRegister(HL_REGISTER))); }; // LD L, (HL)
+void GB::OP6E() { SetByteRegister(L_REGISTER, ReadData(GetWordRegister(HL_REGISTER))); cycle += 4; }; // LD L, (HL)
 void GB::OP6F() { SetByteRegister(L_REGISTER, GetByteRegister(A_REGISTER)); }; // LD L, A
-void GB::OP70() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(B_REGISTER)); }; // LD (HL), B
-void GB::OP71() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(C_REGISTER)); }; // LD (HL), C
-void GB::OP72() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(D_REGISTER)); }; // LD (HL), D
-void GB::OP73() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(E_REGISTER)); }; // LD (HL), E
-void GB::OP74() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(H_REGISTER)); }; // LD (HL), H
-void GB::OP75() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(L_REGISTER)); }; // LD (HL), L
+void GB::OP70() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(B_REGISTER)); cycle += 4; }; // LD (HL), B
+void GB::OP71() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(C_REGISTER)); cycle += 4; }; // LD (HL), C
+void GB::OP72() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(D_REGISTER)); cycle += 4; }; // LD (HL), D
+void GB::OP73() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(E_REGISTER)); cycle += 4; }; // LD (HL), E
+void GB::OP74() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(H_REGISTER)); cycle += 4; }; // LD (HL), H
+void GB::OP75() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(L_REGISTER)); cycle += 4; }; // LD (HL), L
 void GB::OP76() 
 {
 	halt = true;
@@ -1249,14 +1280,14 @@ void GB::OP76()
 	ui8 interruptEnabledFlag = ReadData(m_interrupt_enabled_flag_address);
 	ui8 interruptFlag = ReadData(m_cpu_interupt_flag_address);
 }; // HALT
-void GB::OP77() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(A_REGISTER)); }; // LD (HL), A
-void GB::OP78() { SetByteRegister(A_REGISTER, GetByteRegister(B_REGISTER));}; // LD A, B
-void GB::OP79() { SetByteRegister(A_REGISTER, GetByteRegister(C_REGISTER));}; // LD A, C
-void GB::OP7A() { SetByteRegister(A_REGISTER, GetByteRegister(D_REGISTER));}; // LD A, D
+void GB::OP77() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(A_REGISTER)); cycle += 4; }; // LD (HL), A
+void GB::OP78() { SetByteRegister(A_REGISTER, GetByteRegister(B_REGISTER)); }; // LD A, B
+void GB::OP79() { SetByteRegister(A_REGISTER, GetByteRegister(C_REGISTER)); }; // LD A, C
+void GB::OP7A() { SetByteRegister(A_REGISTER, GetByteRegister(D_REGISTER)); }; // LD A, D
 void GB::OP7B() { SetByteRegister(A_REGISTER, GetByteRegister(E_REGISTER)); }; // LD A, E
 void GB::OP7C() { SetByteRegister(A_REGISTER, GetByteRegister(H_REGISTER)); }; // LD A, H
 void GB::OP7D() { SetByteRegister(A_REGISTER, GetByteRegister(L_REGISTER)); }; // A, L
-void GB::OP7E() { SetByteRegister(A_REGISTER, ReadData(GetWordRegister(HL_REGISTER))); }; // LD A, (HL)
+void GB::OP7E() { SetByteRegister(A_REGISTER, ReadData(GetWordRegister(HL_REGISTER))); cycle += 4; }; // LD A, (HL)
 void GB::OP7F() { SetByteRegister(A_REGISTER, GetByteRegister(A_REGISTER)); }; // LD A, A
 void GB::OP80() { ADD(A_REGISTER, GetByteRegister(B_REGISTER)); }; //ADD A, B
 void GB::OP81() { ADD(A_REGISTER, GetByteRegister(C_REGISTER)); }; // ADD A, C
@@ -1264,7 +1295,7 @@ void GB::OP82() { ADD(A_REGISTER, GetByteRegister(D_REGISTER)); }; // ADD A, D
 void GB::OP83() { ADD(A_REGISTER, GetByteRegister(E_REGISTER)); }; // ADD A, E
 void GB::OP84() { ADD(A_REGISTER, GetByteRegister(H_REGISTER)); }; // ADD A, H
 void GB::OP85() { ADD(A_REGISTER, GetByteRegister(L_REGISTER)); }; // ADD A, L
-void GB::OP86() { ADD(A_REGISTER, ReadData(GetWordRegister(HL_REGISTER)));}; //ADD A, HL
+void GB::OP86() { ADD(A_REGISTER, ReadData(GetWordRegister(HL_REGISTER))); cycle += 4; }; //ADD A, HL
 void GB::OP87() { ADD(A_REGISTER, GetByteRegister(A_REGISTER)); }; // ADD A, A
 void GB::OP88() { ADC(GetByteRegister(B_REGISTER)); }; // ADC B
 void GB::OP89() { ADC(GetByteRegister(C_REGISTER)); }; // ADC C
@@ -1272,7 +1303,7 @@ void GB::OP8A() { ADC(GetByteRegister(D_REGISTER)); }; // ADC D
 void GB::OP8B() { ADC(GetByteRegister(E_REGISTER)); }; // ADC E
 void GB::OP8C() { ADC(GetByteRegister(H_REGISTER)); }; // ADC H
 void GB::OP8D() { ADC(GetByteRegister(L_REGISTER)); }; // ADC L
-void GB::OP8E() { ADC(ReadData(GetWordRegister(HL_REGISTER))); }; // ADC (HL)
+void GB::OP8E() { ADC(ReadData(GetWordRegister(HL_REGISTER))); cycle += 4; }; // ADC (HL)
 void GB::OP8F() { ADC(GetByteRegister(A_REGISTER)); }; // ADC A
 void GB::OP90() { SUB(GetByteRegister(B_REGISTER)); }; // SUB B
 void GB::OP91() { SUB(GetByteRegister(C_REGISTER)); }; // SUB C
@@ -1280,7 +1311,7 @@ void GB::OP92() { SUB(GetByteRegister(D_REGISTER)); }; // SUB D
 void GB::OP93() { SUB(GetByteRegister(E_REGISTER)); }; // SUB E
 void GB::OP94() { SUB(GetByteRegister(H_REGISTER)); }; // SUB H
 void GB::OP95() { SUB(GetByteRegister(L_REGISTER)); }; // SUB L
-void GB::OP96() { SUB(ReadData(GetWordRegister(HL_REGISTER))); }; // SUB HL
+void GB::OP96() { SUB(ReadData(GetWordRegister(HL_REGISTER))); cycle += 4; }; // SUB HL
 void GB::OP97() { SUB(GetByteRegister(A_REGISTER)); }; // SUB A
 void GB::OP98() { SBC(GetByteRegister(B_REGISTER)); }; // SBC A, B
 void GB::OP99() { SBC(GetByteRegister(C_REGISTER));  }; // SBC A, C
@@ -1288,7 +1319,7 @@ void GB::OP9A() { SBC(GetByteRegister(D_REGISTER));  }; // SBC A, D
 void GB::OP9B() { SBC(GetByteRegister(E_REGISTER));  }; // SBC A, E
 void GB::OP9C() { SBC(GetByteRegister(H_REGISTER));  }; // SBC A, H
 void GB::OP9D() { SBC(GetByteRegister(L_REGISTER));  }; // SBC A, L
-void GB::OP9E() { SBC(ReadData(GetWordRegister(HL_REGISTER))); }; // SBC A, (HL)
+void GB::OP9E() { SBC(ReadData(GetWordRegister(HL_REGISTER))); cycle += 4; }; // SBC A, (HL)
 void GB::OP9F() { SBC(GetByteRegister(A_REGISTER));  }; // SBC A, A
 void GB::OPA0() { AND(GetByteRegister(B_REGISTER)); }; // AND A, B
 void GB::OPA1() { AND(GetByteRegister(C_REGISTER)); }; // AND A, C
@@ -1296,7 +1327,7 @@ void GB::OPA2() { AND(GetByteRegister(D_REGISTER)); }; // AND A, D
 void GB::OPA3() { AND(GetByteRegister(E_REGISTER)); }; // AND A, E
 void GB::OPA4() { AND(GetByteRegister(H_REGISTER)); }; // AND A, H
 void GB::OPA5() { AND(GetByteRegister(L_REGISTER)); }; // AND A, L
-void GB::OPA6() { AND(ReadData(GetWordRegister(HL_REGISTER))); }; // AND A, (HL)
+void GB::OPA6() { AND(ReadData(GetWordRegister(HL_REGISTER))); cycle += 4; }; // AND A, (HL)
 void GB::OPA7() { AND(GetByteRegister(A_REGISTER)); }; // AND A, A
 void GB::OPA8() { XOR(GetByteRegister(B_REGISTER)); }; // XOR A, B
 void GB::OPA9() { XOR(GetByteRegister(C_REGISTER)); }; // XOR A, C
@@ -1304,7 +1335,7 @@ void GB::OPAA() { XOR(GetByteRegister(D_REGISTER)); }; // XOR A, D
 void GB::OPAB() { XOR(GetByteRegister(E_REGISTER)); }; // XOR A, E
 void GB::OPAC() { XOR(GetByteRegister(H_REGISTER)); }; // XOR A, H
 void GB::OPAD() { XOR(GetByteRegister(L_REGISTER)); }; // XOR A, L
-void GB::OPAE() { XOR(ReadData(GetWordRegister(HL_REGISTER))); }; // XOR A, (HL)
+void GB::OPAE() { XOR(ReadData(GetWordRegister(HL_REGISTER))); cycle += 4; }; // XOR A, (HL)
 void GB::OPAF() { XOR(GetByteRegister(A_REGISTER)); }; // XOR A, A
 void GB::OPB0() { OR(GetByteRegister(B_REGISTER)); }; // OR B, B
 void GB::OPB1() { OR(GetByteRegister(C_REGISTER)); }; // OR A, C
@@ -1312,7 +1343,7 @@ void GB::OPB2() { OR(GetByteRegister(D_REGISTER)); }; // OR B, D
 void GB::OPB3() { OR(GetByteRegister(E_REGISTER)); }; // OR B, E
 void GB::OPB4() { OR(GetByteRegister(H_REGISTER)); }; // OR B, H
 void GB::OPB5() { OR(GetByteRegister(L_REGISTER)); }; // OR B, L
-void GB::OPB6() { OR(ReadData(GetWordRegister(HL_REGISTER))); }; // OR B, (HL)
+void GB::OPB6() { OR(ReadData(GetWordRegister(HL_REGISTER))); cycle += 4; }; // OR B, (HL)
 void GB::OPB7() { OR(GetByteRegister(A_REGISTER)); }; // OR B, A
 void GB::OPB8() { CP(GetByteRegister(B_REGISTER)); }; // CP A, B
 void GB::OPB9() { CP(GetByteRegister(C_REGISTER)); }; // CP A, C
@@ -1320,7 +1351,7 @@ void GB::OPBA() { CP(GetByteRegister(D_REGISTER)); }; // CP A, D
 void GB::OPBB() { CP(GetByteRegister(E_REGISTER)); }; // CP A, E
 void GB::OPBC() { CP(GetByteRegister(H_REGISTER)); }; // CP A, H
 void GB::OPBD() { CP(GetByteRegister(L_REGISTER)); }; // CP A, L
-void GB::OPBE() { CP(ReadData(GetWordRegister(HL_REGISTER))); }; // CP A, (HL)
+void GB::OPBE() { CP(ReadData(GetWordRegister(HL_REGISTER))); cycle += 4; }; // CP A, (HL)
 void GB::OPBF() { CP(GetByteRegister(A_REGISTER)); }; // CP A, A
 void GB::OPC0() 
 {
@@ -1328,9 +1359,17 @@ void GB::OPC0()
 	{
 		PopStackPC();
 	}
+	cycle += 4;
 }; // RET NZ
 void GB::OPC1() { PopStack(BC_REGISTER); }; // POP BC
-void GB::OPC2() {assert("Missing" && 0);};
+void GB::OPC2() 
+{
+	ui16 address = ReadWord();
+	if (!CheckFlag(FLAG_ZERO))
+	{
+		Jr(address);
+	}
+}; // JP NZ, u16
 void GB::OPC3() { SetPC(ReadWord()); }; //JP u16
 void GB::OPC4() 
 {
@@ -1341,7 +1380,7 @@ void GB::OPC4()
 		SetPC(word);
 	}
 };
-void GB::OPC5() { PushStack(BC_REGISTER); }; // PUSH BC
+void GB::OPC5() { PushStack(BC_REGISTER); cycle += 4; }; // PUSH BC
 void GB::OPC6() { ADD(A_REGISTER, ReadByte()); }; // ADD A, ui8
 void GB::OPC7() {assert("Missing" && 0);};
 void GB::OPC8() 
@@ -1350,6 +1389,7 @@ void GB::OPC8()
 	{
 		PopStackPC();
 	}
+	cycle += 4;
 }; // RET Z
 void GB::OPC9() { PopStackPC(); }; // RET
 void GB::OPCA() 
@@ -1376,13 +1416,20 @@ void GB::OPCD()
 	PushStack(PC_REGISTER); // Stores PC onto SP
 	SetPC(word); // Move to the address};
 } // CALL u16 (Push address of next instruction onto stack and then jump to address)
-void GB::OPCE() {assert("Missing" && 0);};
+void GB::OPCE() { ADC(ReadByte()); }; // ADC A, ui8
 void GB::OPCF() 
 {
 	PushStack(PC_REGISTER);
 	SetPC(RESET_08);
 };
-void GB::OPD0() {assert("Missing" && 0);};
+void GB::OPD0() 
+{
+	if (!CheckFlag(FLAG_CARRY))
+	{
+		PopStackPC();
+	}
+	cycle += 4;
+};
 void GB::OPD1() { PopStack(DE_REGISTER); }; // POP DE
 void GB::OPD2() {assert("Missing" && 0);};
 void GB::OPD3() {assert("Missing" && 0);};
@@ -1395,10 +1442,21 @@ void GB::OPD4()
 		SetPC(word);
 	}
 }; // CALL NC, ui16
-void GB::OPD5() { PushStack(DE_REGISTER); }; // PUSH DE
+void GB::OPD5() { PushStack(DE_REGISTER); cycle += 4; }; // PUSH DE
 void GB::OPD6() { SUB(ReadByte()); }; // SUB ui8
-void GB::OPD7() {assert("Missing" && 0);};
-void GB::OPD8() {assert("Missing" && 0);};
+void GB::OPD7() 
+{
+	PushStack(PC_REGISTER);
+	SetPC(RESET_10);
+}; // RST 10
+void GB::OPD8() 
+{
+	if (CheckFlag(FLAG_CARRY))
+	{
+		PopStackPC();
+	}
+	cycle += 4;
+};
 void GB::OPD9() 
 {
 	PopStackPC();
@@ -1422,12 +1480,12 @@ void GB::OPDF()
 	PushStack(PC_REGISTER);
 	SetPC(RESET_18);
 }; //RST 18
-void GB::OPE0() { WriteData(static_cast<ui16> (0xFF00 + ReadByte()), GetByteRegister(A_REGISTER)); }; // LD (FF00+UI8), A
+void GB::OPE0() { WriteData(static_cast<ui16> (0xFF00 + ReadByte()), GetByteRegister(A_REGISTER)); cycle += 4; }; // LD (FF00+UI8), A
 void GB::OPE1() { PopStack(HL_REGISTER); }; // POP HL
-void GB::OPE2() { WriteData(static_cast<ui16> (0xFF00 + GetByteRegister(C_REGISTER)), GetByteRegister(A_REGISTER)); }; // LD (FF00 + C), A
+void GB::OPE2() { WriteData(static_cast<ui16> (0xFF00 + GetByteRegister(C_REGISTER)), GetByteRegister(A_REGISTER)); cycle += 4; }; // LD (FF00 + C), A
 void GB::OPE3() {assert("Missing" && 0);};
 void GB::OPE4() {assert("Missing" && 0);};
-void GB::OPE5() { PushStack(HL_REGISTER); }; // PUSH HL
+void GB::OPE5() { PushStack(HL_REGISTER); cycle += 4; }; // PUSH HL
 void GB::OPE6() { AND(ReadByte()); }; // AND A, ui8
 void GB::OPE7() {assert("Missing" && 0);};
 void GB::OPE8() 
@@ -1448,28 +1506,29 @@ void GB::OPE8()
 
 	SetWordRegister(SP_REGISTER, static_cast<ui16>(result));
 	IncrementPC();
+	//TODO: doesn't inc pc on gbc?
 }; // ADD SP, i8
 void GB::OPE9() { SetPC(GetWordRegister(HL_REGISTER)); }; // JP HL
-void GB::OPEA() { WriteData(ReadWord(), GetByteRegister(A_REGISTER)); };  //LD (FF00+u8), A
+void GB::OPEA() { WriteData(ReadWord(), GetByteRegister(A_REGISTER)); cycle += 4; };  //LD (FF00+u8), A
 void GB::OPEB() {assert("Invalid CPU Instruction" && 0);};
 void GB::OPEC() {assert("Invalid CPU Instruction" && 0);};
 void GB::OPED() {assert("Invalid CPU Instruction" && 0);};
-void GB::OPEE() {assert("Missing" && 0);};
+void GB::OPEE() { XOR(ReadByte()); }; // XOR A, ui8
 void GB::OPEF() 
 {
 	PushStack(PC_REGISTER);
 	SetPC(RESET_28);
 };
-void GB::OPF0() { SetByteRegister(A_REGISTER, ReadData(static_cast<ui16>(0xFF00 + ReadByte()))); }; // LD A, (FF00+u8)
+void GB::OPF0() { SetByteRegister(A_REGISTER, ReadData(static_cast<ui16>(0xFF00 + ReadByte()))); cycle += 4; }; // LD A, (FF00+u8)
 void GB::OPF1() 
 {
 	PopStack(AF_REGISTER);
 	GetByteRegister(F_REGISTER) &= 0xF0;
 }; // POP AF
-void GB::OPF2() {assert("Missing" && 0);};
+void GB::OPF2() {assert("Missing" && 0); cycle += 4; };
 void GB::OPF3() { interruptsEnabled = false; }; // DI
 void GB::OPF4() {assert("Invalid CPU Instruction" && 0);};
-void GB::OPF5() { PushStack(AF_REGISTER); }; // PUSH AF
+void GB::OPF5() { PushStack(AF_REGISTER); cycle += 4; }; // PUSH AF
 void GB::OPF6() {assert("Missing" && 0);};
 void GB::OPF7() 
 {
@@ -1494,9 +1553,11 @@ void GB::OPF8()
 
 	SetWordRegister(HL_REGISTER, result);
 	IncrementPC();
+
+	//TODO: again why incpc
 }; // LD HL, SP+i8
-void GB::OPF9() {assert("Missing" && 0);};
-void GB::OPFA() { SetByteRegister(A_REGISTER, ReadData(ReadWord())); }; // LD A, (u16)
+void GB::OPF9() { SetWordRegister(SP_REGISTER, GetWordRegister(HL_REGISTER)); cycle += 4; };
+void GB::OPFA() { SetByteRegister(A_REGISTER, ReadData(ReadWord())); cycle += 4; }; // LD A, (u16)
 void GB::OPFB()
 {
 	interruptsEnabled = true; //Enables interrupts (presumably mode 1 on the z80?) http://jgmalcolm.com/z80/advanced/im1i
@@ -1517,7 +1578,7 @@ void GB::OPCB02() {assert("Missing" && 0);};
 void GB::OPCB03() {assert("Missing" && 0);};
 void GB::OPCB04() {assert("Missing" && 0);};
 void GB::OPCB05() {assert("Missing" && 0);};
-void GB::OPCB06() {assert("Missing" && 0);};
+void GB::OPCB06() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCB07() {assert("Missing" && 0);};
 void GB::OPCB08() {assert("Missing" && 0);};
 void GB::OPCB09() {assert("Missing" && 0);};
@@ -1525,7 +1586,7 @@ void GB::OPCB0A() {assert("Missing" && 0);};
 void GB::OPCB0B() {assert("Missing" && 0);};
 void GB::OPCB0C() {assert("Missing" && 0);};
 void GB::OPCB0D() {assert("Missing" && 0);};
-void GB::OPCB0E() {assert("Missing" && 0);};
+void GB::OPCB0E() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCB0F() {assert("Missing" && 0);};
 void GB::OPCB10() {assert("Missing" && 0);};
 void GB::OPCB11() { RL(GetByteRegister(C_REGISTER), false); };
@@ -1533,15 +1594,15 @@ void GB::OPCB12() {assert("Missing" && 0);};
 void GB::OPCB13() {assert("Missing" && 0);};
 void GB::OPCB14() {assert("Missing" && 0);};
 void GB::OPCB15() {assert("Missing" && 0);};
-void GB::OPCB16() {assert("Missing" && 0);};
+void GB::OPCB16() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCB17() {assert("Missing" && 0);};
-void GB::OPCB18() {assert("Missing" && 0);};
-void GB::OPCB19() {assert("Missing" && 0);};
-void GB::OPCB1A() {assert("Missing" && 0);};
-void GB::OPCB1B() {assert("Missing" && 0);};
-void GB::OPCB1C() {assert("Missing" && 0);};
-void GB::OPCB1D() {assert("Missing" && 0);};
-void GB::OPCB1E() {assert("Missing" && 0);};
+void GB::OPCB18() { RR(GetByteRegister(B_REGISTER), false); }; // RR B
+void GB::OPCB19() { RR(GetByteRegister(C_REGISTER), false); }; // RR C
+void GB::OPCB1A() { RR(GetByteRegister(D_REGISTER), false); }; // RR D
+void GB::OPCB1B() { RR(GetByteRegister(E_REGISTER), false); }; // RR E
+void GB::OPCB1C() { RR(GetByteRegister(H_REGISTER), false); }; // RR H
+void GB::OPCB1D() { RR(GetByteRegister(L_REGISTER), false); }; // RR L
+void GB::OPCB1E() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCB1F() {assert("Missing" && 0);};
 void GB::OPCB20() {assert("Missing" && 0);};
 void GB::OPCB21() {assert("Missing" && 0);};
@@ -1549,7 +1610,7 @@ void GB::OPCB22() {assert("Missing" && 0);};
 void GB::OPCB23() {assert("Missing" && 0);};
 void GB::OPCB24() {assert("Missing" && 0);};
 void GB::OPCB25() {assert("Missing" && 0);};
-void GB::OPCB26() {assert("Missing" && 0);};
+void GB::OPCB26() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCB27() {assert("Missing" && 0);};
 void GB::OPCB28() {assert("Missing" && 0);};
 void GB::OPCB29() {assert("Missing" && 0);};
@@ -1557,7 +1618,7 @@ void GB::OPCB2A() {assert("Missing" && 0);};
 void GB::OPCB2B() {assert("Missing" && 0);};
 void GB::OPCB2C() {assert("Missing" && 0);};
 void GB::OPCB2D() {assert("Missing" && 0);};
-void GB::OPCB2E() {assert("Missing" && 0);};
+void GB::OPCB2E() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCB2F() {assert("Missing" && 0);};
 void GB::OPCB30() {assert("Missing" && 0);};
 void GB::OPCB31() {assert("Missing" && 0);};
@@ -1565,15 +1626,15 @@ void GB::OPCB32() {assert("Missing" && 0);};
 void GB::OPCB33() {assert("Missing" && 0);};
 void GB::OPCB34() {assert("Missing" && 0);};
 void GB::OPCB35() {assert("Missing" && 0);};
-void GB::OPCB36() {assert("Missing" && 0);};
-void GB::OPCB37() { Swap(GetByteRegister(A_REGISTER)); };
-void GB::OPCB38() {assert("Missing" && 0);};
-void GB::OPCB39() {assert("Missing" && 0);};
-void GB::OPCB3A() {assert("Missing" && 0);};
-void GB::OPCB3B() {assert("Missing" && 0);};
-void GB::OPCB3C() {assert("Missing" && 0);};
-void GB::OPCB3D() {assert("Missing" && 0);};
-void GB::OPCB3E() {assert("Missing" && 0);};
+void GB::OPCB36() {assert("Missing" && 0); cycle += 8; };
+void GB::OPCB37() { Swap(GetByteRegister(A_REGISTER)); }; // SWAP A
+void GB::OPCB38() { SRL(GetByteRegister(B_REGISTER)); }; // SRL B
+void GB::OPCB39() { SRL(GetByteRegister(C_REGISTER)); }; // SRL C
+void GB::OPCB3A() { SRL(GetByteRegister(D_REGISTER)); }; // SRL D
+void GB::OPCB3B() { SRL(GetByteRegister(E_REGISTER)); }; // SRL E
+void GB::OPCB3C() { SRL(GetByteRegister(H_REGISTER)); }; // SRL H
+void GB::OPCB3D() { SRL(GetByteRegister(L_REGISTER)); }; // SRL L
+void GB::OPCB3E() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCB3F() {assert("Missing" && 0);};
 void GB::OPCB40() {assert("Missing" && 0);};
 void GB::OPCB41() {assert("Missing" && 0);};
@@ -1581,7 +1642,7 @@ void GB::OPCB42() {assert("Missing" && 0);};
 void GB::OPCB43() {assert("Missing" && 0);};
 void GB::OPCB44() {assert("Missing" && 0);};
 void GB::OPCB45() {assert("Missing" && 0);};
-void GB::OPCB46() {assert("Missing" && 0);};
+void GB::OPCB46() {assert("Missing" && 0); cycle += 4; };
 void GB::OPCB47() {assert("Missing" && 0);};
 void GB::OPCB48() {assert("Missing" && 0);};
 void GB::OPCB49() {assert("Missing" && 0);};
@@ -1589,7 +1650,7 @@ void GB::OPCB4A() {assert("Missing" && 0);};
 void GB::OPCB4B() {assert("Missing" && 0);};
 void GB::OPCB4C() {assert("Missing" && 0);};
 void GB::OPCB4D() {assert("Missing" && 0);};
-void GB::OPCB4E() {assert("Missing" && 0);};
+void GB::OPCB4E() {assert("Missing" && 0); cycle += 4; };
 void GB::OPCB4F() {assert("Missing" && 0);};
 void GB::OPCB50() { Bit(GetByteRegister(B_REGISTER), 2); }; // BIT B, 2
 void GB::OPCB51() { Bit(GetByteRegister(C_REGISTER), 2); }; // BIT C, 2
@@ -1597,7 +1658,7 @@ void GB::OPCB52() { Bit(GetByteRegister(D_REGISTER), 2); }; // BIT D, 2
 void GB::OPCB53() { Bit(GetByteRegister(E_REGISTER), 2); }; // BIT E, 2
 void GB::OPCB54() { Bit(GetByteRegister(H_REGISTER), 2); }; // BIT H, 2
 void GB::OPCB55() { Bit(GetByteRegister(L_REGISTER), 2); }; // BIT L, 2
-void GB::OPCB56() {assert("Missing" && 0);};
+void GB::OPCB56() {assert("Missing" && 0); cycle += 4; };
 void GB::OPCB57() {assert("Missing" && 0);};
 void GB::OPCB58() { Bit(GetByteRegister(B_REGISTER), 3); }; // BIT B, 3
 void GB::OPCB59() { Bit(GetByteRegister(C_REGISTER), 3); }; // BIT C, 3
@@ -1605,7 +1666,7 @@ void GB::OPCB5A() { Bit(GetByteRegister(D_REGISTER), 3); }; // BIT D, 3
 void GB::OPCB5B() { Bit(GetByteRegister(E_REGISTER), 3); }; // BIT E, 3
 void GB::OPCB5C() { Bit(GetByteRegister(H_REGISTER), 3); }; // BIT H, 3
 void GB::OPCB5D() { Bit(GetByteRegister(L_REGISTER), 3); }; // BIT L, 3
-void GB::OPCB5E() { assert("Missing" && 0); }; 
+void GB::OPCB5E() { assert("Missing" && 0); cycle += 4; };
 void GB::OPCB5F() { Bit(GetByteRegister(A_REGISTER), 3); }; // BIT A, 3
 void GB::OPCB60() { Bit(GetByteRegister(B_REGISTER), 3); }; // BIT B, 4
 void GB::OPCB61() { Bit(GetByteRegister(C_REGISTER), 3); }; // BIT C, 4
@@ -1613,7 +1674,7 @@ void GB::OPCB62() { Bit(GetByteRegister(D_REGISTER), 3); }; // BIT D, 4
 void GB::OPCB63() { Bit(GetByteRegister(E_REGISTER), 3); }; // BIT E, 4
 void GB::OPCB64() { Bit(GetByteRegister(H_REGISTER), 3); }; // BIT H, 4
 void GB::OPCB65() { Bit(GetByteRegister(L_REGISTER), 3); }; // BIT L, 4
-void GB::OPCB66() { assert("Missing" && 0); };
+void GB::OPCB66() { assert("Missing" && 0); cycle += 4; };
 void GB::OPCB67() { Bit(GetByteRegister(A_REGISTER), 4); }; // BIT A, 4
 void GB::OPCB68() { assert("Missing" && 0); };
 void GB::OPCB69() { assert("Missing" && 0); };
@@ -1621,7 +1682,7 @@ void GB::OPCB6A() { assert("Missing" && 0); };
 void GB::OPCB6B() { assert("Missing" && 0); };
 void GB::OPCB6C() { assert("Missing" && 0); };
 void GB::OPCB6D() { assert("Missing" && 0); };
-void GB::OPCB6E() { assert("Missing" && 0); };
+void GB::OPCB6E() { assert("Missing" && 0); cycle += 4; };
 void GB::OPCB6F() { Bit(GetByteRegister(A_REGISTER), 5); }; // BIT A, 5
 void GB::OPCB70() { Bit(GetByteRegister(B_REGISTER), 6); }; // BIT B, 6
 void GB::OPCB71() { Bit(GetByteRegister(C_REGISTER), 6); }; // BIT C, 6
@@ -1629,7 +1690,7 @@ void GB::OPCB72() { Bit(GetByteRegister(D_REGISTER), 6); }; // BIT D, 6
 void GB::OPCB73() { Bit(GetByteRegister(E_REGISTER), 6); }; // BIT E, 6
 void GB::OPCB74() { Bit(GetByteRegister(H_REGISTER), 6); }; // BIT H, 6
 void GB::OPCB75() { Bit(GetByteRegister(L_REGISTER), 6); }; // BIT L, 6
-void GB::OPCB76() {assert("Missing" && 0);};
+void GB::OPCB76() {assert("Missing" && 0); cycle += 4; };
 void GB::OPCB77() { Bit(GetByteRegister(A_REGISTER), 6); }; // BIT A, 6
 void GB::OPCB78() { Bit(GetByteRegister(B_REGISTER), 7); }; // BIT B, 7
 void GB::OPCB79() { Bit(GetByteRegister(C_REGISTER), 7); };	// BIT C, 7
@@ -1637,7 +1698,7 @@ void GB::OPCB7A() { Bit(GetByteRegister(D_REGISTER), 7); };	// BIT D, 7
 void GB::OPCB7B() { Bit(GetByteRegister(E_REGISTER), 7); };	// BIT E, 7
 void GB::OPCB7C() { Bit(GetByteRegister(H_REGISTER), 7); };	// BIT H, 7
 void GB::OPCB7D() { Bit(GetByteRegister(L_REGISTER), 7); };	// BIT L, 7
-void GB::OPCB7E() {assert("Missing" && 0);};
+void GB::OPCB7E() {assert("Missing" && 0); cycle += 4; };
 void GB::OPCB7F() {assert("Missing" && 0);};
 void GB::OPCB80() {assert("Missing" && 0);};
 void GB::OPCB81() {assert("Missing" && 0);};
@@ -1645,7 +1706,7 @@ void GB::OPCB82() {assert("Missing" && 0);};
 void GB::OPCB83() {assert("Missing" && 0);};
 void GB::OPCB84() {assert("Missing" && 0);};
 void GB::OPCB85() {assert("Missing" && 0);};
-void GB::OPCB86() {assert("Missing" && 0);};
+void GB::OPCB86() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCB87() { ClearBit(GetByteRegister(A_REGISTER), 0); };
 void GB::OPCB88() { ClearBit(GetByteRegister(B_REGISTER), 1); };
 void GB::OPCB89() { ClearBit(GetByteRegister(C_REGISTER), 1); };
@@ -1653,7 +1714,7 @@ void GB::OPCB8A() { ClearBit(GetByteRegister(D_REGISTER), 1); };
 void GB::OPCB8B() { ClearBit(GetByteRegister(E_REGISTER), 1); };
 void GB::OPCB8C() { ClearBit(GetByteRegister(H_REGISTER), 1); };
 void GB::OPCB8D() { ClearBit(GetByteRegister(L_REGISTER), 1); };
-void GB::OPCB8E() {assert("Missing" && 0);};
+void GB::OPCB8E() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCB8F() {assert("Missing" && 0);};
 void GB::OPCB90() {assert("Missing" && 0);};
 void GB::OPCB91() {assert("Missing" && 0);};
@@ -1661,7 +1722,7 @@ void GB::OPCB92() {assert("Missing" && 0);};
 void GB::OPCB93() {assert("Missing" && 0);};
 void GB::OPCB94() {assert("Missing" && 0);};
 void GB::OPCB95() {assert("Missing" && 0);};
-void GB::OPCB96() {assert("Missing" && 0);};
+void GB::OPCB96() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCB97() {assert("Missing" && 0);};
 void GB::OPCB98() {assert("Missing" && 0);};
 void GB::OPCB99() {assert("Missing" && 0);};
@@ -1669,7 +1730,7 @@ void GB::OPCB9A() {assert("Missing" && 0);};
 void GB::OPCB9B() {assert("Missing" && 0);};
 void GB::OPCB9C() {assert("Missing" && 0);};
 void GB::OPCB9D() {assert("Missing" && 0);};
-void GB::OPCB9E() {assert("Missing" && 0);};
+void GB::OPCB9E() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCB9F() {assert("Missing" && 0);};
 void GB::OPCBA0() {assert("Missing" && 0);};
 void GB::OPCBA1() {assert("Missing" && 0);};
@@ -1677,7 +1738,7 @@ void GB::OPCBA2() {assert("Missing" && 0);};
 void GB::OPCBA3() {assert("Missing" && 0);};
 void GB::OPCBA4() {assert("Missing" && 0);};
 void GB::OPCBA5() {assert("Missing" && 0);};
-void GB::OPCBA6() {assert("Missing" && 0);};
+void GB::OPCBA6() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCBA7() {assert("Missing" && 0);};
 void GB::OPCBA8() {assert("Missing" && 0);};
 void GB::OPCBA9() {assert("Missing" && 0);};
@@ -1685,7 +1746,7 @@ void GB::OPCBAA() {assert("Missing" && 0);};
 void GB::OPCBAB() {assert("Missing" && 0);};
 void GB::OPCBAC() {assert("Missing" && 0);};
 void GB::OPCBAD() {assert("Missing" && 0);};
-void GB::OPCBAE() {assert("Missing" && 0);};
+void GB::OPCBAE() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCBAF() {assert("Missing" && 0);};
 void GB::OPCBB0() {assert("Missing" && 0);};
 void GB::OPCBB1() {assert("Missing" && 0);};
@@ -1693,7 +1754,7 @@ void GB::OPCBB2() {assert("Missing" && 0);};
 void GB::OPCBB3() {assert("Missing" && 0);};
 void GB::OPCBB4() {assert("Missing" && 0);};
 void GB::OPCBB5() {assert("Missing" && 0);};
-void GB::OPCBB6() {assert("Missing" && 0);};
+void GB::OPCBB6() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCBB7() {assert("Missing" && 0);};
 void GB::OPCBB8() {assert("Missing" && 0);};
 void GB::OPCBB9() {assert("Missing" && 0);};
@@ -1701,7 +1762,7 @@ void GB::OPCBBA() {assert("Missing" && 0);};
 void GB::OPCBBB() {assert("Missing" && 0);};
 void GB::OPCBBC() {assert("Missing" && 0);};
 void GB::OPCBBD() {assert("Missing" && 0);};
-void GB::OPCBBE() {assert("Missing" && 0);};
+void GB::OPCBBE() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCBBF() {assert("Missing" && 0);};
 void GB::OPCBC0() {assert("Missing" && 0);};
 void GB::OPCBC1() {assert("Missing" && 0);};
@@ -1709,7 +1770,7 @@ void GB::OPCBC2() {assert("Missing" && 0);};
 void GB::OPCBC3() {assert("Missing" && 0);};
 void GB::OPCBC4() {assert("Missing" && 0);};
 void GB::OPCBC5() {assert("Missing" && 0);};
-void GB::OPCBC6() {assert("Missing" && 0);};
+void GB::OPCBC6() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCBC7() {assert("Missing" && 0);};
 void GB::OPCBC8() {assert("Missing" && 0);};
 void GB::OPCBC9() {assert("Missing" && 0);};
@@ -1717,7 +1778,7 @@ void GB::OPCBCA() {assert("Missing" && 0);};
 void GB::OPCBCB() {assert("Missing" && 0);};
 void GB::OPCBCC() {assert("Missing" && 0);};
 void GB::OPCBCD() {assert("Missing" && 0);};
-void GB::OPCBCE() {assert("Missing" && 0);};
+void GB::OPCBCE() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCBCF() {assert("Missing" && 0);};
 void GB::OPCBD0() {assert("Missing" && 0);};
 void GB::OPCBD1() {assert("Missing" && 0);};
@@ -1725,7 +1786,7 @@ void GB::OPCBD2() {assert("Missing" && 0);};
 void GB::OPCBD3() {assert("Missing" && 0);};
 void GB::OPCBD4() {assert("Missing" && 0);};
 void GB::OPCBD5() {assert("Missing" && 0);};
-void GB::OPCBD6() {assert("Missing" && 0);};
+void GB::OPCBD6() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCBD7() {assert("Missing" && 0);};
 void GB::OPCBD8() {assert("Missing" && 0);};
 void GB::OPCBD9() {assert("Missing" && 0);};
@@ -1733,7 +1794,7 @@ void GB::OPCBDA() {assert("Missing" && 0);};
 void GB::OPCBDB() {assert("Missing" && 0);};
 void GB::OPCBDC() {assert("Missing" && 0);};
 void GB::OPCBDD() {assert("Missing" && 0);};
-void GB::OPCBDE() {assert("Missing" && 0);};
+void GB::OPCBDE() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCBDF() {assert("Missing" && 0);};
 void GB::OPCBE0() {assert("Missing" && 0);};
 void GB::OPCBE1() {assert("Missing" && 0);};
@@ -1741,7 +1802,7 @@ void GB::OPCBE2() {assert("Missing" && 0);};
 void GB::OPCBE3() {assert("Missing" && 0);};
 void GB::OPCBE4() {assert("Missing" && 0);};
 void GB::OPCBE5() {assert("Missing" && 0);};
-void GB::OPCBE6() {assert("Missing" && 0);};
+void GB::OPCBE6() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCBE7() {assert("Missing" && 0);};
 void GB::OPCBE8() {assert("Missing" && 0);};
 void GB::OPCBE9() {assert("Missing" && 0);};
@@ -1749,7 +1810,7 @@ void GB::OPCBEA() {assert("Missing" && 0);};
 void GB::OPCBEB() {assert("Missing" && 0);};
 void GB::OPCBEC() {assert("Missing" && 0);};
 void GB::OPCBED() {assert("Missing" && 0);};
-void GB::OPCBEE() {assert("Missing" && 0);};
+void GB::OPCBEE() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCBEF() {assert("Missing" && 0);};
 void GB::OPCBF0() {assert("Missing" && 0);};
 void GB::OPCBF1() {assert("Missing" && 0);};
@@ -1757,7 +1818,7 @@ void GB::OPCBF2() {assert("Missing" && 0);};
 void GB::OPCBF3() {assert("Missing" && 0);};
 void GB::OPCBF4() {assert("Missing" && 0);};
 void GB::OPCBF5() {assert("Missing" && 0);};
-void GB::OPCBF6() {assert("Missing" && 0);};
+void GB::OPCBF6() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCBF7() {assert("Missing" && 0);};
 void GB::OPCBF8() {assert("Missing" && 0);};
 void GB::OPCBF9() {assert("Missing" && 0);};
@@ -1765,7 +1826,7 @@ void GB::OPCBFA() {assert("Missing" && 0);};
 void GB::OPCBFB() {assert("Missing" && 0);};
 void GB::OPCBFC() {assert("Missing" && 0);};
 void GB::OPCBFD() {assert("Missing" && 0);};
-void GB::OPCBFE() {assert("Missing" && 0);};
+void GB::OPCBFE() {assert("Missing" && 0); cycle += 8; };
 void GB::OPCBFF() {assert("Missing" && 0);};
 
 
