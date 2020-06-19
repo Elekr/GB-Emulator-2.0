@@ -211,14 +211,6 @@ void GB::WriteData(ui16 address, ui8 data)
 		return;
 	}
 
-
-	// Unusable Memory
-	/*if (InMemoryRange(0xFEA0, 0xFEFF, address)) // Low Frequancy
-	{
-		m_bus_memory[address] = data;
-		return;
-	}*/
-
 	// Other uncaught Write commands
 	m_bus[address] = data;
 }
@@ -379,7 +371,7 @@ void GB::PopStackPC()
 	GetWordRegister(SP_REGISTER)++;
 	high = ReadData(GetWordRegister(SP_REGISTER));
 	GetWordRegister(SP_REGISTER)++;
-	SetWordRegister(PC_REGISTER, data);
+	//SetWordRegister(PC_REGISTER, data);
 
 	cycle += 8;
 
@@ -392,11 +384,12 @@ void GB::INCByteRegister(const ui8& reg) //Increments register and sets flags (Z
 
 	ClearFlags();
 
-	SetFlag(FLAG_CARRY, hasCarry);
-
 	GetByteRegister(reg)++;
 
+	SetFlag(FLAG_CARRY, hasCarry);
+
 	SetFlag(FLAG_ZERO, GetByteRegister(reg) == 0);
+
 	SetFlag(FLAG_HALFCARRY, (GetByteRegister(reg) & 0x0F) == 0x00);
 
 	//http://www.z80.info/z80syntx.htm#INC <- helpful information on INC
@@ -434,7 +427,7 @@ void GB::SetFlag(int flag, bool value)
 
 bool GB::CheckFlag(int flag)
 {
-	return HasBit(GetByteRegister(F_REGISTER), flag); // Shift the number to the right then AND mask it to 1
+	return (GetByteRegister(F_REGISTER) >> flag) & 1; // Shift the number to the right then AND mask it to 1
 }
 
 void GB::ClearFlags() /////////
@@ -481,9 +474,10 @@ void GB::ADDHL(const ui16& reg)
 
 void GB::Bit(const ui8& value, ui8 bit)
 {
+	ClearFlags();
+
 	SetFlag(FLAG_ZERO, ((value >> bit) & 0x01) == 0);
 	SetFlag(FLAG_HALFCARRY, true);
-	SetFlag(FLAG_SUBTRACT, false);
 }
 
 void GB::XOR(const ui8& value)
@@ -494,6 +488,7 @@ void GB::XOR(const ui8& value)
 
 	ClearFlags();
 	SetFlag(FLAG_ZERO, (result == 0));
+
 }
 
 void GB::OR(const ui8& value)
@@ -780,8 +775,13 @@ bool GB::TickCPU()
 		cycle = (normalCycles[OPCode] * 4);
 		cycles += cycle;
 
-		int address1 = 0xc3Ae;
-		int address2 = 0xc7D2;
+		int address1 = 0xC50f;
+		int address2 = 0xc5f8;
+
+		//if (GetWordRegister(PC_REGISTER) == address1 /*&& GetWordRegister(PC_REGISTER) <= address2*/)
+		//{
+		//	DEBUGGING = true;
+		//}
 
 		if (OPCode == 0xCB) // Extra Codes
 		{
@@ -799,7 +799,7 @@ bool GB::TickCPU()
 					std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;
 				}
 
-
+				
 				//OUTPUTCBREGISTERS(OPCode);
 			}
 
@@ -813,8 +813,10 @@ bool GB::TickCPU()
 				{
 					OUTPUTREGISTERS(OPCode);
 					std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;
+
 				}
 
+			
 				//OUTPUTCBREGISTERS(OPCode);
 			}
 
@@ -824,7 +826,7 @@ bool GB::TickCPU()
 	
 	TickClock();
 	bool vSync = updatePixels();
-	JoyPadTick();
+	//JoyPadTick();
 	return vSync;
 }
 
@@ -980,22 +982,22 @@ void GB::CheckInterrupts()
 
 void GB::CompareLYWithLYC()
 {
-	ui8& controlBit = ReadData(lcdcRegister); // Get the LCDC register from the CPU
-	ui8& line = ReadData(LYRegister);
+	ui8 controlBit = ReadData(lcdcRegister); // Get the LCDC register from the CPU
+	ui8 line = ReadData(LYRegister);
 
 	bool isDisplayEnabled = HasBit(controlBit, 7);
 
 	if (isDisplayEnabled)
 	{
-		ui8& status = ReadData(statusRegister);
-		ui8& LYC = ReadData(lycRegister);
+		ui8 status = ReadData(statusRegister);
+		ui8 LYC = ReadData(lycRegister);
 
 		if (LYC == line)
 		{
 			SetBit(status, 2);
 			if (HasBit(status, 6))
 			{
-				//LCD Interrupt
+				RequestInterupt(LCD);
 			}
 		}
 		else
@@ -1050,7 +1052,7 @@ void GB::OP17() { RL(GetByteRegister(A_REGISTER), true); }; // RLA
 void GB::OP18() { Jr(); }; // Jr i8
 void GB::OP19() { ADDHL(GetWordRegister(DE_REGISTER)); }; // ADD HL, DE
 void GB::OP1A() { SetByteRegister(A_REGISTER, ReadData(GetWordRegister(DE_REGISTER))); cycle += 4; }; // LD A, (DE)
-void GB::OP1B() { GetWordRegister(DE_REGISTER)++; cycle += 4; }; // DEC DE
+void GB::OP1B() { GetWordRegister(DE_REGISTER)--; cycle += 4; }; // DEC DE
 void GB::OP1C() { INCByteRegister(E_REGISTER); }; // INC E
 void GB::OP1D() { DECByteRegister(E_REGISTER); }; // DEC E
 void GB::OP1E() { SetByteRegister(E_REGISTER, ReadByte()); }; // LD E, ui8
@@ -1148,7 +1150,7 @@ void GB::OP32()
 void GB::OP33() { GetWordRegister(SP_REGISTER)++;  cycle += 4; }; // INC SP
 void GB::OP34() 
 {
-	ui8 byte = ReadData(HL_REGISTER); // store the data
+	ui8 byte = ReadData(GetWordRegister(HL_REGISTER)); // store the data
 	byte++; // inc
 	WriteData(GetWordRegister(HL_REGISTER), byte);
 

@@ -14,8 +14,8 @@ typedef signed __int16 i16;
 
 const int windowMultiplier = 4;
 
-const int A_REGISTER = 0;
-const int F_REGISTER = 1;
+const int A_REGISTER = 1;
+const int F_REGISTER = 0;
 const int B_REGISTER = 3; //Lower bits
 const int C_REGISTER = 2; //Upper bits
 const int D_REGISTER = 5;
