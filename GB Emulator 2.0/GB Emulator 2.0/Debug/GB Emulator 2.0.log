@@ -1,5 +1,5 @@
 ﻿  GB.cpp
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(783,26): warning C4553: '==': result of expression not used; did you intend '='?
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(1405,6): warning C4244: 'argument': conversion from 'ui16' to 'const ui8', possible loss of data
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(1435,6): warning C4244: 'argument': conversion from 'ui16' to 'const ui8', possible loss of data
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(792,26): warning C4553: '==': result of expression not used; did you intend '='?
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(1414,6): warning C4244: 'argument': conversion from 'ui16' to 'const ui8', possible loss of data
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(1444,6): warning C4244: 'argument': conversion from 'ui16' to 'const ui8', possible loss of data
   GB Emulator 2.0.vcxproj -> C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\Debug\GB Emulator 2.0.exe

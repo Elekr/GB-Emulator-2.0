@@ -154,7 +154,7 @@ void GB::WriteData(ui16 address, ui8 data)
 				else
 				{
 					std::cout << "Booted Successfully" << std::endl;
-					//DEBUGGING = true;
+					DEBUGGING = true;
 				/*	std::cout << std::hex << (int)m_bus[0x2f0] << std::endl;*/
 
 					//ui8* cartridgeMemory = m_cartridge.GetRawData();
@@ -217,6 +217,14 @@ void GB::WriteData(ui16 address, ui8 data)
 
 ui8& GB::ReadData(ui16 address)
 {
+	if (DEBUGGING)
+	{
+		if (address == 0xD81D)
+		{
+			std::cout << "hi" << std::endl;
+		}
+
+	}
 	return m_bus[address];
 }
 
@@ -506,6 +514,7 @@ void GB::OR(const ui8& value)
 
 void GB::LDI(const ui16& address, const ui8& reg)
 {
+
 	WriteData(address, GetByteRegister(reg));
 	GetWordRegister(HL_REGISTER)++;
 
@@ -808,8 +817,8 @@ bool GB::TickCPU()
 		cycle = (normalCycles[OPCode] * 4);
 		cycles += cycle;
 
-		int address1 = 0xC50f;
-		int address2 = 0xc5f8;
+		int address1 = 0xc856;
+		int address2 = 0xc86c;
 
 		//if (GetWordRegister(PC_REGISTER) == address1 /*&& GetWordRegister(PC_REGISTER) <= address2*/)
 		//{
@@ -1394,7 +1403,7 @@ void GB::OPC0()
 	{
 		PopStackPC();
 	}
-	cycle += 4;
+	//cycle += 4;
 }; // RET NZ
 void GB::OPC1() { PopStack(BC_REGISTER); }; // POP BC
 void GB::OPC2() 
@@ -1414,7 +1423,7 @@ void GB::OPC4()
 		PushStack(PC_REGISTER);
 		SetPC(word);
 	}
-};
+}; // CALL NZ| ui16
 void GB::OPC5() { PushStack(BC_REGISTER); cycle += 4; }; // PUSH BC
 void GB::OPC6() { ADD(A_REGISTER, ReadByte()); }; // ADD A, ui8
 void GB::OPC7() {assert("Missing" && 0);};
@@ -1449,7 +1458,8 @@ void GB::OPCD()
 {
 	ui16 word = ReadWord(); //Get the address 
 	PushStack(PC_REGISTER); // Stores PC onto SP
-	SetPC(word); // Move to the address};
+	SetPC(word); // Move to the address;
+
 } // CALL u16 (Push address of next instruction onto stack and then jump to address)
 void GB::OPCE() { ADC(ReadByte()); }; // ADC A, ui8
 void GB::OPCF() 
@@ -1496,7 +1506,7 @@ void GB::OPD9()
 {
 	PopStackPC();
 	interruptsEnabled = true;
-};
+}; // RETI
 void GB::OPDA() {assert("Missing" && 0);};
 void GB::OPDB() {assert("Missing" && 0);};
 void GB::OPDC() 
