@@ -331,6 +331,10 @@ public:
 
     void AND(const ui8& value);
 
+    void SLA(ui8& value);
+
+    void SRA(ui8& value);
+
     //****CB
 
     void Swap(ui8& value);

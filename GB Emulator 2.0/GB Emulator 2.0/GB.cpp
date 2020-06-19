@@ -701,6 +701,39 @@ void GB::AND(const ui8& value)
 	SetFlag(FLAG_HALFCARRY, true);
 }
 
+void GB::SLA(ui8& value)
+{
+	ClearFlags();
+	if ((value & 0x80) != 0)
+	{
+		SetFlag(FLAG_CARRY, true);
+	}
+
+	value <<= 1;
+	SetFlag(FLAG_ZERO, value == 0);
+}
+
+void GB::SRA(ui8& value)
+{
+	ClearFlags();
+	if ((value & 0x01) != 0)
+	{
+		SetFlag(FLAG_CARRY, true);
+	}
+
+	if ((value & 0x80) != 0)
+	{
+		value >>= 1;
+		value |= 0x80;
+	}
+	else
+	{
+		value >>= 1;
+	}
+
+	SetFlag(FLAG_ZERO, value == 0);
+}
+
 void GB::Swap(ui8& value)
 {
 	ui8 low_half = value & 0x0F;
@@ -1476,7 +1509,7 @@ void GB::OPDC()
 	}
 }; // CALL C, u16
 void GB::OPDD() {assert("Invalid CPU Instruction" && 0);};
-void GB::OPDE() {assert("Missing" && 0);};
+void GB::OPDE() { SBC(ReadByte()); }; // SBC A, u8
 void GB::OPDF() 
 {
 	PushStack(PC_REGISTER);
@@ -1527,11 +1560,11 @@ void GB::OPF1()
 	PopStack(AF_REGISTER);
 	GetByteRegister(F_REGISTER) &= 0xF0;
 }; // POP AF
-void GB::OPF2() {assert("Missing" && 0); cycle += 4; };
+void GB::OPF2() { SetByteRegister(A_REGISTER, ReadData(static_cast<ui16> (0xFF00 + GetByteRegister(C_REGISTER)))); cycle += 4; };
 void GB::OPF3() { interruptsEnabled = false; }; // DI
 void GB::OPF4() {assert("Invalid CPU Instruction" && 0);};
 void GB::OPF5() { PushStack(AF_REGISTER); cycle += 4; }; // PUSH AF
-void GB::OPF6() {assert("Missing" && 0);};
+void GB::OPF6() { OR(ReadByte()); }; //OR ui8
 void GB::OPF7() 
 {
 	PushStack(PC_REGISTER);
@@ -1574,101 +1607,141 @@ void GB::OPFF()
 }; // RST 38h 
 
 //CB OP CODES
-void GB::OPCB00() {assert("Missing" && 0);};
-void GB::OPCB01() {assert("Missing" && 0);};
-void GB::OPCB02() {assert("Missing" && 0);};
-void GB::OPCB03() {assert("Missing" && 0);};
-void GB::OPCB04() {assert("Missing" && 0);};
-void GB::OPCB05() {assert("Missing" && 0);};
-void GB::OPCB06() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCB07() {assert("Missing" && 0);};
-void GB::OPCB08() {assert("Missing" && 0);};
-void GB::OPCB09() {assert("Missing" && 0);};
-void GB::OPCB0A() {assert("Missing" && 0);};
-void GB::OPCB0B() {assert("Missing" && 0);};
-void GB::OPCB0C() {assert("Missing" && 0);};
-void GB::OPCB0D() {assert("Missing" && 0);};
-void GB::OPCB0E() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCB0F() {assert("Missing" && 0);};
-void GB::OPCB10() {assert("Missing" && 0);};
-void GB::OPCB11() { RL(GetByteRegister(C_REGISTER), false); };
-void GB::OPCB12() {assert("Missing" && 0);};
-void GB::OPCB13() {assert("Missing" && 0);};
-void GB::OPCB14() {assert("Missing" && 0);};
-void GB::OPCB15() {assert("Missing" && 0);};
-void GB::OPCB16() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCB17() {assert("Missing" && 0);};
+void GB::OPCB00() { RLC(GetByteRegister(B_REGISTER), false); }; // RLC B
+void GB::OPCB01() { RLC(GetByteRegister(C_REGISTER), false); }; // RLC C
+void GB::OPCB02() { RLC(GetByteRegister(D_REGISTER), false); }; // RLC D
+void GB::OPCB03() { RLC(GetByteRegister(E_REGISTER), false); }; // RLC E
+void GB::OPCB04() { RLC(GetByteRegister(H_REGISTER), false); }; // RLC H
+void GB::OPCB05() { RLC(GetByteRegister(L_REGISTER), false); }; // RLC L
+void GB::OPCB06() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	RLC(data, false);
+	WriteData(GetWordRegister(HL_REGISTER), data);
+}; //RLC (HL)
+void GB::OPCB07() { RLC(GetByteRegister(A_REGISTER), false); }; // RLC, A
+void GB::OPCB08() { RRC(GetByteRegister(B_REGISTER), false); }; // RRC B
+void GB::OPCB09() { RRC(GetByteRegister(C_REGISTER), false); }; // RRC C
+void GB::OPCB0A() { RRC(GetByteRegister(D_REGISTER), false); }; // RRC D
+void GB::OPCB0B() { RRC(GetByteRegister(E_REGISTER), false); }; // RRC E
+void GB::OPCB0C() { RRC(GetByteRegister(H_REGISTER), false); }; // RRC H
+void GB::OPCB0D() { RRC(GetByteRegister(L_REGISTER), false); }; // RRC L
+void GB::OPCB0E() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	RRC(data, false);
+	WriteData(GetWordRegister(HL_REGISTER), data);
+}; // RRC (HL)
+void GB::OPCB0F() { RRC(GetByteRegister(A_REGISTER), false); }; // RRC A
+void GB::OPCB10() { RL(GetByteRegister(B_REGISTER), false); }; // RL, B
+void GB::OPCB11() { RL(GetByteRegister(C_REGISTER), false); }; // RL, C
+void GB::OPCB12() { RL(GetByteRegister(D_REGISTER), false); };	// RL, D
+void GB::OPCB13() { RL(GetByteRegister(E_REGISTER), false); };	// RL, E
+void GB::OPCB14() { RL(GetByteRegister(H_REGISTER), false); };	// RL, H
+void GB::OPCB15() { RL(GetByteRegister(L_REGISTER), false); };	// RL, L
+void GB::OPCB16() { RL(ReadData(GetWordRegister(HL_REGISTER)), false);  cycle += 8; }; // RL, (HL)
+void GB::OPCB17() { RL(GetByteRegister(A_REGISTER), false); }; // RL, A
 void GB::OPCB18() { RR(GetByteRegister(B_REGISTER), false); }; // RR B
 void GB::OPCB19() { RR(GetByteRegister(C_REGISTER), false); }; // RR C
 void GB::OPCB1A() { RR(GetByteRegister(D_REGISTER), false); }; // RR D
 void GB::OPCB1B() { RR(GetByteRegister(E_REGISTER), false); }; // RR E
 void GB::OPCB1C() { RR(GetByteRegister(H_REGISTER), false); }; // RR H
 void GB::OPCB1D() { RR(GetByteRegister(L_REGISTER), false); }; // RR L
-void GB::OPCB1E() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCB1F() {assert("Missing" && 0);};
-void GB::OPCB20() {assert("Missing" && 0);};
-void GB::OPCB21() {assert("Missing" && 0);};
-void GB::OPCB22() {assert("Missing" && 0);};
-void GB::OPCB23() {assert("Missing" && 0);};
-void GB::OPCB24() {assert("Missing" && 0);};
-void GB::OPCB25() {assert("Missing" && 0);};
-void GB::OPCB26() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCB27() {assert("Missing" && 0);};
-void GB::OPCB28() {assert("Missing" && 0);};
-void GB::OPCB29() {assert("Missing" && 0);};
-void GB::OPCB2A() {assert("Missing" && 0);};
-void GB::OPCB2B() {assert("Missing" && 0);};
-void GB::OPCB2C() {assert("Missing" && 0);};
-void GB::OPCB2D() {assert("Missing" && 0);};
-void GB::OPCB2E() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCB2F() {assert("Missing" && 0);};
-void GB::OPCB30() {assert("Missing" && 0);};
-void GB::OPCB31() {assert("Missing" && 0);};
-void GB::OPCB32() {assert("Missing" && 0);};
-void GB::OPCB33() {assert("Missing" && 0);};
-void GB::OPCB34() {assert("Missing" && 0);};
-void GB::OPCB35() {assert("Missing" && 0);};
-void GB::OPCB36() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCB37() { Swap(GetByteRegister(A_REGISTER)); }; // SWAP A
-void GB::OPCB38() { SRL(GetByteRegister(B_REGISTER)); }; // SRL B
-void GB::OPCB39() { SRL(GetByteRegister(C_REGISTER)); }; // SRL C
-void GB::OPCB3A() { SRL(GetByteRegister(D_REGISTER)); }; // SRL D
-void GB::OPCB3B() { SRL(GetByteRegister(E_REGISTER)); }; // SRL E
-void GB::OPCB3C() { SRL(GetByteRegister(H_REGISTER)); }; // SRL H
-void GB::OPCB3D() { SRL(GetByteRegister(L_REGISTER)); }; // SRL L
-void GB::OPCB3E() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCB3F() {assert("Missing" && 0);};
-void GB::OPCB40() {assert("Missing" && 0);};
-void GB::OPCB41() {assert("Missing" && 0);};
-void GB::OPCB42() {assert("Missing" && 0);};
-void GB::OPCB43() {assert("Missing" && 0);};
-void GB::OPCB44() {assert("Missing" && 0);};
-void GB::OPCB45() {assert("Missing" && 0);};
-void GB::OPCB46() {assert("Missing" && 0); cycle += 4; };
-void GB::OPCB47() {assert("Missing" && 0);};
-void GB::OPCB48() {assert("Missing" && 0);};
-void GB::OPCB49() {assert("Missing" && 0);};
-void GB::OPCB4A() {assert("Missing" && 0);};
-void GB::OPCB4B() {assert("Missing" && 0);};
-void GB::OPCB4C() {assert("Missing" && 0);};
-void GB::OPCB4D() {assert("Missing" && 0);};
-void GB::OPCB4E() {assert("Missing" && 0); cycle += 4; };
-void GB::OPCB4F() {assert("Missing" && 0);};
+void GB::OPCB1E() { RR(ReadData(GetWordRegister(HL_REGISTER)), false); cycle += 8; }; // RR (HL)
+void GB::OPCB1F() { RR(GetByteRegister(A_REGISTER), false); }; // RR A
+void GB::OPCB20() { SLA(GetByteRegister(B_REGISTER)); }; // SLA, B
+void GB::OPCB21() { SLA(GetByteRegister(C_REGISTER)); }; // SLA, C
+void GB::OPCB22() { SLA(GetByteRegister(D_REGISTER)); }; // SLA, D
+void GB::OPCB23() { SLA(GetByteRegister(E_REGISTER)); }; // SLA, E
+void GB::OPCB24() { SLA(GetByteRegister(H_REGISTER)); }; // SLA, H
+void GB::OPCB25() { SLA(GetByteRegister(L_REGISTER)); }; // SLA, L
+void GB::OPCB26() { SLA(ReadData(GetWordRegister(HL_REGISTER))); cycle += 8; }; // SLA, (HL)
+void GB::OPCB27() { SLA(GetByteRegister(A_REGISTER)); }; // SLA, A
+void GB::OPCB28() { SRA(GetByteRegister(B_REGISTER)); }; // SRA, B
+void GB::OPCB29() { SRA(GetByteRegister(C_REGISTER)); }; // SRA, C
+void GB::OPCB2A() { SRA(GetByteRegister(D_REGISTER)); }; // SRA, D
+void GB::OPCB2B() { SRA(GetByteRegister(E_REGISTER)); }; // SRA, E
+void GB::OPCB2C() { SRA(GetByteRegister(H_REGISTER)); }; // SRA, H
+void GB::OPCB2D() { SRA(GetByteRegister(L_REGISTER)); }; // SRA, L
+void GB::OPCB2E() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	SRA(data);
+	WriteData(GetWordRegister(HL_REGISTER), data);
+	cycle += 8;
+}; // SRA, (HL)
+void GB::OPCB2F() { SRA(GetByteRegister(A_REGISTER)); }; // SRA, A
+void GB::OPCB30() { Swap(GetByteRegister(B_REGISTER)); }; // SWAP, B
+void GB::OPCB31() { Swap(GetByteRegister(C_REGISTER)); }; // SWAP, C
+void GB::OPCB32() { Swap(GetByteRegister(D_REGISTER)); }; // SWAP, D
+void GB::OPCB33() { Swap(GetByteRegister(E_REGISTER)); }; // SWAP, E
+void GB::OPCB34() { Swap(GetByteRegister(H_REGISTER)); }; // SWAP, H
+void GB::OPCB35() { Swap(GetByteRegister(L_REGISTER)); }; // SWAP, L
+void GB::OPCB36() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	Swap(data);
+	WriteData(GetWordRegister(HL_REGISTER), data);
+	cycle += 8;
+}; //SWAP (HL)
+void GB::OPCB37() { Swap(GetByteRegister(A_REGISTER)); }; // SWAP, A
+void GB::OPCB38() { SRL(GetByteRegister(B_REGISTER)); }; // SRL, B
+void GB::OPCB39() { SRL(GetByteRegister(C_REGISTER)); }; // SRL, C
+void GB::OPCB3A() { SRL(GetByteRegister(D_REGISTER)); }; // SRL, D
+void GB::OPCB3B() { SRL(GetByteRegister(E_REGISTER)); }; // SRL, E
+void GB::OPCB3C() { SRL(GetByteRegister(H_REGISTER)); }; // SRL, H
+void GB::OPCB3D() { SRL(GetByteRegister(L_REGISTER)); }; // SRL, L
+void GB::OPCB3E() { SRL(ReadData(GetWordRegister(HL_REGISTER))); cycle += 8; }; // SRL, (HL)
+void GB::OPCB3F() { SRL(GetByteRegister(A_REGISTER)); }; // SRL, A
+void GB::OPCB40() { Bit(GetByteRegister(B_REGISTER), 0); }; // BIT 0, B
+void GB::OPCB41() { Bit(GetByteRegister(C_REGISTER), 0); };	// BIT 0, C
+void GB::OPCB42() { Bit(GetByteRegister(D_REGISTER), 0); };	// BIT 0, D
+void GB::OPCB43() { Bit(GetByteRegister(E_REGISTER), 0); };	// BIT 0, E
+void GB::OPCB44() { Bit(GetByteRegister(H_REGISTER), 0); };	// BIT 0, H
+void GB::OPCB45() { Bit(GetByteRegister(L_REGISTER), 0); };	// BIT 0, L
+void GB::OPCB46() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	Bit(data, 0);
+	cycle += 4;
+}; // BIT 0, (HL)
+void GB::OPCB47() { Bit(GetByteRegister(A_REGISTER), 0); }; // BIT 0, A
+void GB::OPCB48() { Bit(GetByteRegister(B_REGISTER), 1); };	// BIT 1, B
+void GB::OPCB49() { Bit(GetByteRegister(C_REGISTER), 1); };	// BIT 1, C
+void GB::OPCB4A() { Bit(GetByteRegister(D_REGISTER), 1); };	// BIT 1, D
+void GB::OPCB4B() { Bit(GetByteRegister(E_REGISTER), 1); };	// BIT 1, E
+void GB::OPCB4C() { Bit(GetByteRegister(H_REGISTER), 1); };	// BIT 1, H
+void GB::OPCB4D() { Bit(GetByteRegister(L_REGISTER), 1); };	// BIT 1, L
+void GB::OPCB4E() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	Bit(data, 1);
+	cycle += 4;
+};
+void GB::OPCB4F() { Bit(GetByteRegister(A_REGISTER), 1); }; // BIT 1, A
 void GB::OPCB50() { Bit(GetByteRegister(B_REGISTER), 2); }; // BIT B, 2
 void GB::OPCB51() { Bit(GetByteRegister(C_REGISTER), 2); }; // BIT C, 2
 void GB::OPCB52() { Bit(GetByteRegister(D_REGISTER), 2); }; // BIT D, 2
 void GB::OPCB53() { Bit(GetByteRegister(E_REGISTER), 2); }; // BIT E, 2
 void GB::OPCB54() { Bit(GetByteRegister(H_REGISTER), 2); }; // BIT H, 2
 void GB::OPCB55() { Bit(GetByteRegister(L_REGISTER), 2); }; // BIT L, 2
-void GB::OPCB56() {assert("Missing" && 0); cycle += 4; };
-void GB::OPCB57() {assert("Missing" && 0);};
+void GB::OPCB56() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	Bit(data, 2); cycle += 4;
+};
+void GB::OPCB57() { Bit(GetByteRegister(A_REGISTER), 2); }; // BIT A, 2
 void GB::OPCB58() { Bit(GetByteRegister(B_REGISTER), 3); }; // BIT B, 3
 void GB::OPCB59() { Bit(GetByteRegister(C_REGISTER), 3); }; // BIT C, 3
 void GB::OPCB5A() { Bit(GetByteRegister(D_REGISTER), 3); }; // BIT D, 3
 void GB::OPCB5B() { Bit(GetByteRegister(E_REGISTER), 3); }; // BIT E, 3
 void GB::OPCB5C() { Bit(GetByteRegister(H_REGISTER), 3); }; // BIT H, 3
 void GB::OPCB5D() { Bit(GetByteRegister(L_REGISTER), 3); }; // BIT L, 3
-void GB::OPCB5E() { assert("Missing" && 0); cycle += 4; };
+void GB::OPCB5E() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	Bit(data, 3); cycle += 4;
+}; // BIT (HL), 3
 void GB::OPCB5F() { Bit(GetByteRegister(A_REGISTER), 3); }; // BIT A, 3
 void GB::OPCB60() { Bit(GetByteRegister(B_REGISTER), 3); }; // BIT B, 4
 void GB::OPCB61() { Bit(GetByteRegister(C_REGISTER), 3); }; // BIT C, 4
@@ -1676,15 +1749,23 @@ void GB::OPCB62() { Bit(GetByteRegister(D_REGISTER), 3); }; // BIT D, 4
 void GB::OPCB63() { Bit(GetByteRegister(E_REGISTER), 3); }; // BIT E, 4
 void GB::OPCB64() { Bit(GetByteRegister(H_REGISTER), 3); }; // BIT H, 4
 void GB::OPCB65() { Bit(GetByteRegister(L_REGISTER), 3); }; // BIT L, 4
-void GB::OPCB66() { assert("Missing" && 0); cycle += 4; };
+void GB::OPCB66() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	Bit(data, 4);
+}; // BIT (HL), 4
 void GB::OPCB67() { Bit(GetByteRegister(A_REGISTER), 4); }; // BIT A, 4
-void GB::OPCB68() { assert("Missing" && 0); };
-void GB::OPCB69() { assert("Missing" && 0); };
-void GB::OPCB6A() { assert("Missing" && 0); };
-void GB::OPCB6B() { assert("Missing" && 0); };
-void GB::OPCB6C() { assert("Missing" && 0); };
-void GB::OPCB6D() { assert("Missing" && 0); };
-void GB::OPCB6E() { assert("Missing" && 0); cycle += 4; };
+void GB::OPCB68() { Bit(GetByteRegister(B_REGISTER), 5); };	// BIT B, 5
+void GB::OPCB69() { Bit(GetByteRegister(C_REGISTER), 5); };	// BIT C, 5
+void GB::OPCB6A() { Bit(GetByteRegister(D_REGISTER), 5); };	// BIT D, 5
+void GB::OPCB6B() { Bit(GetByteRegister(E_REGISTER), 5); };	// BIT E, 5
+void GB::OPCB6C() { Bit(GetByteRegister(H_REGISTER), 5); };	// BIT H, 5
+void GB::OPCB6D() { Bit(GetByteRegister(L_REGISTER), 5); };	// BIT L, 5
+void GB::OPCB6E() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	Bit(data, 5); cycle += 4; 
+}; // BIT (HL), 5
 void GB::OPCB6F() { Bit(GetByteRegister(A_REGISTER), 5); }; // BIT A, 5
 void GB::OPCB70() { Bit(GetByteRegister(B_REGISTER), 6); }; // BIT B, 6
 void GB::OPCB71() { Bit(GetByteRegister(C_REGISTER), 6); }; // BIT C, 6
@@ -1692,7 +1773,12 @@ void GB::OPCB72() { Bit(GetByteRegister(D_REGISTER), 6); }; // BIT D, 6
 void GB::OPCB73() { Bit(GetByteRegister(E_REGISTER), 6); }; // BIT E, 6
 void GB::OPCB74() { Bit(GetByteRegister(H_REGISTER), 6); }; // BIT H, 6
 void GB::OPCB75() { Bit(GetByteRegister(L_REGISTER), 6); }; // BIT L, 6
-void GB::OPCB76() {assert("Missing" && 0); cycle += 4; };
+void GB::OPCB76() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	Bit(data, 6);
+	cycle += 4;
+}; // BIT, (HL), 6
 void GB::OPCB77() { Bit(GetByteRegister(A_REGISTER), 6); }; // BIT A, 6
 void GB::OPCB78() { Bit(GetByteRegister(B_REGISTER), 7); }; // BIT B, 7
 void GB::OPCB79() { Bit(GetByteRegister(C_REGISTER), 7); };	// BIT C, 7
@@ -1700,136 +1786,235 @@ void GB::OPCB7A() { Bit(GetByteRegister(D_REGISTER), 7); };	// BIT D, 7
 void GB::OPCB7B() { Bit(GetByteRegister(E_REGISTER), 7); };	// BIT E, 7
 void GB::OPCB7C() { Bit(GetByteRegister(H_REGISTER), 7); };	// BIT H, 7
 void GB::OPCB7D() { Bit(GetByteRegister(L_REGISTER), 7); };	// BIT L, 7
-void GB::OPCB7E() {assert("Missing" && 0); cycle += 4; };
-void GB::OPCB7F() {assert("Missing" && 0);};
-void GB::OPCB80() {assert("Missing" && 0);};
-void GB::OPCB81() {assert("Missing" && 0);};
-void GB::OPCB82() {assert("Missing" && 0);};
-void GB::OPCB83() {assert("Missing" && 0);};
-void GB::OPCB84() {assert("Missing" && 0);};
-void GB::OPCB85() {assert("Missing" && 0);};
-void GB::OPCB86() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCB87() { ClearBit(GetByteRegister(A_REGISTER), 0); };
-void GB::OPCB88() { ClearBit(GetByteRegister(B_REGISTER), 1); };
-void GB::OPCB89() { ClearBit(GetByteRegister(C_REGISTER), 1); };
-void GB::OPCB8A() { ClearBit(GetByteRegister(D_REGISTER), 1); };
-void GB::OPCB8B() { ClearBit(GetByteRegister(E_REGISTER), 1); };
-void GB::OPCB8C() { ClearBit(GetByteRegister(H_REGISTER), 1); };
-void GB::OPCB8D() { ClearBit(GetByteRegister(L_REGISTER), 1); };
-void GB::OPCB8E() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCB8F() {assert("Missing" && 0);};
-void GB::OPCB90() {assert("Missing" && 0);};
-void GB::OPCB91() {assert("Missing" && 0);};
-void GB::OPCB92() {assert("Missing" && 0);};
-void GB::OPCB93() {assert("Missing" && 0);};
-void GB::OPCB94() {assert("Missing" && 0);};
-void GB::OPCB95() {assert("Missing" && 0);};
-void GB::OPCB96() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCB97() {assert("Missing" && 0);};
-void GB::OPCB98() {assert("Missing" && 0);};
-void GB::OPCB99() {assert("Missing" && 0);};
-void GB::OPCB9A() {assert("Missing" && 0);};
-void GB::OPCB9B() {assert("Missing" && 0);};
-void GB::OPCB9C() {assert("Missing" && 0);};
-void GB::OPCB9D() {assert("Missing" && 0);};
-void GB::OPCB9E() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCB9F() {assert("Missing" && 0);};
-void GB::OPCBA0() {assert("Missing" && 0);};
-void GB::OPCBA1() {assert("Missing" && 0);};
-void GB::OPCBA2() {assert("Missing" && 0);};
-void GB::OPCBA3() {assert("Missing" && 0);};
-void GB::OPCBA4() {assert("Missing" && 0);};
-void GB::OPCBA5() {assert("Missing" && 0);};
-void GB::OPCBA6() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCBA7() {assert("Missing" && 0);};
-void GB::OPCBA8() {assert("Missing" && 0);};
-void GB::OPCBA9() {assert("Missing" && 0);};
-void GB::OPCBAA() {assert("Missing" && 0);};
-void GB::OPCBAB() {assert("Missing" && 0);};
-void GB::OPCBAC() {assert("Missing" && 0);};
-void GB::OPCBAD() {assert("Missing" && 0);};
-void GB::OPCBAE() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCBAF() {assert("Missing" && 0);};
-void GB::OPCBB0() {assert("Missing" && 0);};
-void GB::OPCBB1() {assert("Missing" && 0);};
-void GB::OPCBB2() {assert("Missing" && 0);};
-void GB::OPCBB3() {assert("Missing" && 0);};
-void GB::OPCBB4() {assert("Missing" && 0);};
-void GB::OPCBB5() {assert("Missing" && 0);};
-void GB::OPCBB6() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCBB7() {assert("Missing" && 0);};
-void GB::OPCBB8() {assert("Missing" && 0);};
-void GB::OPCBB9() {assert("Missing" && 0);};
-void GB::OPCBBA() {assert("Missing" && 0);};
-void GB::OPCBBB() {assert("Missing" && 0);};
-void GB::OPCBBC() {assert("Missing" && 0);};
-void GB::OPCBBD() {assert("Missing" && 0);};
-void GB::OPCBBE() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCBBF() {assert("Missing" && 0);};
-void GB::OPCBC0() {assert("Missing" && 0);};
-void GB::OPCBC1() {assert("Missing" && 0);};
-void GB::OPCBC2() {assert("Missing" && 0);};
-void GB::OPCBC3() {assert("Missing" && 0);};
-void GB::OPCBC4() {assert("Missing" && 0);};
-void GB::OPCBC5() {assert("Missing" && 0);};
-void GB::OPCBC6() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCBC7() {assert("Missing" && 0);};
-void GB::OPCBC8() {assert("Missing" && 0);};
-void GB::OPCBC9() {assert("Missing" && 0);};
-void GB::OPCBCA() {assert("Missing" && 0);};
-void GB::OPCBCB() {assert("Missing" && 0);};
-void GB::OPCBCC() {assert("Missing" && 0);};
-void GB::OPCBCD() {assert("Missing" && 0);};
-void GB::OPCBCE() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCBCF() {assert("Missing" && 0);};
-void GB::OPCBD0() {assert("Missing" && 0);};
-void GB::OPCBD1() {assert("Missing" && 0);};
-void GB::OPCBD2() {assert("Missing" && 0);};
-void GB::OPCBD3() {assert("Missing" && 0);};
-void GB::OPCBD4() {assert("Missing" && 0);};
-void GB::OPCBD5() {assert("Missing" && 0);};
-void GB::OPCBD6() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCBD7() {assert("Missing" && 0);};
-void GB::OPCBD8() {assert("Missing" && 0);};
-void GB::OPCBD9() {assert("Missing" && 0);};
-void GB::OPCBDA() {assert("Missing" && 0);};
-void GB::OPCBDB() {assert("Missing" && 0);};
-void GB::OPCBDC() {assert("Missing" && 0);};
-void GB::OPCBDD() {assert("Missing" && 0);};
-void GB::OPCBDE() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCBDF() {assert("Missing" && 0);};
-void GB::OPCBE0() {assert("Missing" && 0);};
-void GB::OPCBE1() {assert("Missing" && 0);};
-void GB::OPCBE2() {assert("Missing" && 0);};
-void GB::OPCBE3() {assert("Missing" && 0);};
-void GB::OPCBE4() {assert("Missing" && 0);};
-void GB::OPCBE5() {assert("Missing" && 0);};
-void GB::OPCBE6() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCBE7() {assert("Missing" && 0);};
-void GB::OPCBE8() {assert("Missing" && 0);};
-void GB::OPCBE9() {assert("Missing" && 0);};
-void GB::OPCBEA() {assert("Missing" && 0);};
-void GB::OPCBEB() {assert("Missing" && 0);};
-void GB::OPCBEC() {assert("Missing" && 0);};
-void GB::OPCBED() {assert("Missing" && 0);};
-void GB::OPCBEE() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCBEF() {assert("Missing" && 0);};
-void GB::OPCBF0() {assert("Missing" && 0);};
-void GB::OPCBF1() {assert("Missing" && 0);};
-void GB::OPCBF2() {assert("Missing" && 0);};
-void GB::OPCBF3() {assert("Missing" && 0);};
-void GB::OPCBF4() {assert("Missing" && 0);};
-void GB::OPCBF5() {assert("Missing" && 0);};
-void GB::OPCBF6() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCBF7() {assert("Missing" && 0);};
-void GB::OPCBF8() {assert("Missing" && 0);};
-void GB::OPCBF9() {assert("Missing" && 0);};
-void GB::OPCBFA() {assert("Missing" && 0);};
-void GB::OPCBFB() {assert("Missing" && 0);};
-void GB::OPCBFC() {assert("Missing" && 0);};
-void GB::OPCBFD() {assert("Missing" && 0);};
-void GB::OPCBFE() {assert("Missing" && 0); cycle += 8; };
-void GB::OPCBFF() {assert("Missing" && 0);};
+void GB::OPCB7E() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	Bit(data, 7);
+}; //BIT (HL), 7
+void GB::OPCB7F() { Bit(GetByteRegister(A_REGISTER), 7); }; // BIT A, 7
+void GB::OPCB80() { ClearBit(GetByteRegister(B_REGISTER), 0) ;}; // RES B, 0
+void GB::OPCB81() { ClearBit(GetByteRegister(C_REGISTER), 0); }; // RES C, 0
+void GB::OPCB82() { ClearBit(GetByteRegister(D_REGISTER), 0); }; // RES D, 0
+void GB::OPCB83() { ClearBit(GetByteRegister(E_REGISTER), 0); }; // RES E, 0
+void GB::OPCB84() { ClearBit(GetByteRegister(H_REGISTER), 0); }; // RES H, 0
+void GB::OPCB85() { ClearBit(GetByteRegister(L_REGISTER), 0); }; // RES L, 0
+void GB::OPCB86() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	ClearBit(data, 0);
+	WriteData(GetWordRegister(HL_REGISTER), data); cycle += 8; 
+}; // BIT HL, 7
+void GB::OPCB87() { ClearBit(GetByteRegister(A_REGISTER), 0); }; // RES A, 0
+void GB::OPCB88() { ClearBit(GetByteRegister(B_REGISTER), 1); }; // RES B, 1
+void GB::OPCB89() { ClearBit(GetByteRegister(C_REGISTER), 1); }; // RES C, 1
+void GB::OPCB8A() { ClearBit(GetByteRegister(D_REGISTER), 1); }; // RES D, 1
+void GB::OPCB8B() { ClearBit(GetByteRegister(E_REGISTER), 1); }; // RES E, 1
+void GB::OPCB8C() { ClearBit(GetByteRegister(H_REGISTER), 1); }; // RES H, 1
+void GB::OPCB8D() { ClearBit(GetByteRegister(L_REGISTER), 1); }; // RES L, 1
+void GB::OPCB8E() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	ClearBit(data, 1);
+	WriteData(GetWordRegister(HL_REGISTER), data);
+	cycle += 8; 
+};
+void GB::OPCB8F() { ClearBit(GetByteRegister(A_REGISTER), 1); }; //RES A, 1
+void GB::OPCB90() { ClearBit(GetByteRegister(B_REGISTER), 2); }; //RES B, 2
+void GB::OPCB91() { ClearBit(GetByteRegister(C_REGISTER), 2); }; //RES C, 2
+void GB::OPCB92() { ClearBit(GetByteRegister(D_REGISTER), 2); }; //RES D, 2
+void GB::OPCB93() { ClearBit(GetByteRegister(E_REGISTER), 2); }; //RES E, 2
+void GB::OPCB94() { ClearBit(GetByteRegister(H_REGISTER), 2); }; //RES H, 2
+void GB::OPCB95() { ClearBit(GetByteRegister(L_REGISTER), 2); }; //RES L, 2
+void GB::OPCB96() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	ClearBit(data, 2);
+	WriteData(GetWordRegister(HL_REGISTER), data);
+	cycle += 8; 
+};
+void GB::OPCB97() { ClearBit(GetByteRegister(A_REGISTER), 2); }; //RES A, 2
+void GB::OPCB98() { ClearBit(GetByteRegister(B_REGISTER), 3); }; //RES B, 3
+void GB::OPCB99() { ClearBit(GetByteRegister(C_REGISTER), 3); }; //RES C, 3
+void GB::OPCB9A() { ClearBit(GetByteRegister(D_REGISTER), 3); }; //RES D, 3
+void GB::OPCB9B() { ClearBit(GetByteRegister(E_REGISTER), 3); }; //RES E, 3
+void GB::OPCB9C() { ClearBit(GetByteRegister(H_REGISTER), 3); }; //RES H, 3
+void GB::OPCB9D() { ClearBit(GetByteRegister(L_REGISTER), 3); }; //RES L, 3
+void GB::OPCB9E() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	ClearBit(data, 3);
+	WriteData(GetWordRegister(HL_REGISTER), data);
+	cycle += 8;
+};
+void GB::OPCB9F() { ClearBit(GetByteRegister(A_REGISTER), 3); }; //RES A, 3
+void GB::OPCBA0() { ClearBit(GetByteRegister(B_REGISTER), 4); }; //RES B, 4
+void GB::OPCBA1() { ClearBit(GetByteRegister(C_REGISTER), 4); }; //RES C, 4
+void GB::OPCBA2() { ClearBit(GetByteRegister(D_REGISTER), 4); }; //RES D, 4
+void GB::OPCBA3() { ClearBit(GetByteRegister(E_REGISTER), 4); }; //RES E, 4
+void GB::OPCBA4() { ClearBit(GetByteRegister(H_REGISTER), 4); }; //RES H, 4
+void GB::OPCBA5() { ClearBit(GetByteRegister(L_REGISTER), 4); }; //RES L, 4
+void GB::OPCBA6() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	ClearBit(data, 4);
+	WriteData(GetWordRegister(HL_REGISTER), data);
+	cycle += 8;
+};
+void GB::OPCBA7() { ClearBit(GetByteRegister(A_REGISTER), 4); }; //RES A, 4
+void GB::OPCBA8() { ClearBit(GetByteRegister(B_REGISTER), 5); }; //RES B, 5
+void GB::OPCBA9() { ClearBit(GetByteRegister(C_REGISTER), 5); }; //RES C, 5
+void GB::OPCBAA() { ClearBit(GetByteRegister(D_REGISTER), 5); }; //RES D, 5
+void GB::OPCBAB() { ClearBit(GetByteRegister(E_REGISTER), 5); }; //RES E, 5
+void GB::OPCBAC() { ClearBit(GetByteRegister(H_REGISTER), 5); }; //RES H, 5
+void GB::OPCBAD() { ClearBit(GetByteRegister(L_REGISTER), 5); }; //RES L, 5
+void GB::OPCBAE() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	ClearBit(data, 5);
+	WriteData(GetWordRegister(HL_REGISTER), data);
+	cycle += 8;
+};
+void GB::OPCBAF() { ClearBit(GetByteRegister(A_REGISTER), 5); }; //RES A, 5
+void GB::OPCBB0() { ClearBit(GetByteRegister(B_REGISTER), 6); }; //RES B, 6
+void GB::OPCBB1() { ClearBit(GetByteRegister(C_REGISTER), 6); }; //RES C, 6
+void GB::OPCBB2() { ClearBit(GetByteRegister(D_REGISTER), 6); }; //RES D, 6
+void GB::OPCBB3() { ClearBit(GetByteRegister(E_REGISTER), 6); }; //RES E, 6
+void GB::OPCBB4() { ClearBit(GetByteRegister(H_REGISTER), 6); }; //RES H, 6
+void GB::OPCBB5() { ClearBit(GetByteRegister(L_REGISTER), 6); }; //RES L, 6
+void GB::OPCBB6() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	ClearBit(data, 6);
+	WriteData(GetWordRegister(HL_REGISTER), data);
+	cycle += 8;
+};
+void GB::OPCBB7() { ClearBit(GetByteRegister(A_REGISTER), 6); }; //RES A, 6
+void GB::OPCBB8() { ClearBit(GetByteRegister(B_REGISTER), 7); }; //RES B, 7
+void GB::OPCBB9() { ClearBit(GetByteRegister(C_REGISTER), 7); }; //RES C, 7
+void GB::OPCBBA() { ClearBit(GetByteRegister(D_REGISTER), 7); }; //RES D, 7
+void GB::OPCBBB() { ClearBit(GetByteRegister(E_REGISTER), 7); }; //RES E, 7
+void GB::OPCBBC() { ClearBit(GetByteRegister(H_REGISTER), 7); }; //RES H, 7
+void GB::OPCBBD() { ClearBit(GetByteRegister(L_REGISTER), 7); }; //RES L, 7
+void GB::OPCBBE() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	ClearBit(data, 7);
+	WriteData(GetWordRegister(HL_REGISTER), data);
+	cycle += 8;
+};
+void GB::OPCBBF() { ClearBit(GetByteRegister(L_REGISTER), 7); }; // RES A, 7 
+void GB::OPCBC0() { SetBit(GetByteRegister(B_REGISTER), 0); }; // SET 0, B
+void GB::OPCBC1() { SetBit(GetByteRegister(C_REGISTER), 0); }; // SET 0, C
+void GB::OPCBC2() { SetBit(GetByteRegister(D_REGISTER), 0); }; // SET 0, D
+void GB::OPCBC3() { SetBit(GetByteRegister(E_REGISTER), 0); }; // SET 0, E
+void GB::OPCBC4() { SetBit(GetByteRegister(H_REGISTER), 0); }; // SET 0, H
+void GB::OPCBC5() { SetBit(GetByteRegister(L_REGISTER), 0); }; // SET 0, L
+void GB::OPCBC6() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	SetBit(data, 0);
+	WriteData(GetWordRegister(HL_REGISTER), data);
+	cycle += 8;
+};
+void GB::OPCBC7() { SetBit(GetByteRegister(A_REGISTER), 0); }; // SET 0, A
+void GB::OPCBC8() { SetBit(GetByteRegister(B_REGISTER), 1); }; // SET 1, B
+void GB::OPCBC9() { SetBit(GetByteRegister(C_REGISTER), 1); }; // SET 1, C
+void GB::OPCBCA() { SetBit(GetByteRegister(D_REGISTER), 1); }; // SET 1, D
+void GB::OPCBCB() { SetBit(GetByteRegister(E_REGISTER), 1); }; // SET 1, E
+void GB::OPCBCC() { SetBit(GetByteRegister(H_REGISTER), 1); }; // SET 1, H
+void GB::OPCBCD() { SetBit(GetByteRegister(L_REGISTER), 1); }; // SET 1, L
+void GB::OPCBCE() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	SetBit(data, 1);
+	WriteData(GetWordRegister(HL_REGISTER), data);
+	cycle += 8;
+};
+void GB::OPCBCF() { SetBit(GetByteRegister(A_REGISTER), 1); }; // SET 1, A
+void GB::OPCBD0() { SetBit(GetByteRegister(B_REGISTER), 2); }; // SET 2, B
+void GB::OPCBD1() { SetBit(GetByteRegister(C_REGISTER), 2); }; // SET 2, C
+void GB::OPCBD2() { SetBit(GetByteRegister(D_REGISTER), 2); }; // SET 2, D
+void GB::OPCBD3() { SetBit(GetByteRegister(E_REGISTER), 2); }; // SET 2, E
+void GB::OPCBD4() { SetBit(GetByteRegister(H_REGISTER), 2); }; // SET 2, H
+void GB::OPCBD5() { SetBit(GetByteRegister(L_REGISTER), 2); }; // SET 2, L
+void GB::OPCBD6() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	SetBit(data, 2);
+	WriteData(GetWordRegister(HL_REGISTER), data);
+	cycle += 8;
+};
+void GB::OPCBD7() { SetBit(GetByteRegister(A_REGISTER), 2); }; // SET 2, A
+void GB::OPCBD8() { SetBit(GetByteRegister(B_REGISTER), 3); }; // SET 3, B
+void GB::OPCBD9() { SetBit(GetByteRegister(C_REGISTER), 3); }; // SET 3, C
+void GB::OPCBDA() { SetBit(GetByteRegister(D_REGISTER), 3); }; // SET 3, D
+void GB::OPCBDB() { SetBit(GetByteRegister(E_REGISTER), 3); }; // SET 3, E
+void GB::OPCBDC() { SetBit(GetByteRegister(H_REGISTER), 3); }; // SET 3, H
+void GB::OPCBDD() { SetBit(GetByteRegister(L_REGISTER), 3); }; // SET 3, L
+void GB::OPCBDE() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	SetBit(data, 3);
+	WriteData(GetWordRegister(HL_REGISTER), data);
+	cycle += 8;
+};
+void GB::OPCBDF() { SetBit(GetByteRegister(A_REGISTER), 3); }; // SET 3, A
+void GB::OPCBE0() { SetBit(GetByteRegister(B_REGISTER), 4); }; // SET 4, B
+void GB::OPCBE1() { SetBit(GetByteRegister(C_REGISTER), 4); }; // SET 4, C
+void GB::OPCBE2() { SetBit(GetByteRegister(D_REGISTER), 4); }; // SET 4, D
+void GB::OPCBE3() { SetBit(GetByteRegister(E_REGISTER), 4); }; // SET 4, E
+void GB::OPCBE4() { SetBit(GetByteRegister(H_REGISTER), 4); }; // SET 4, H
+void GB::OPCBE5() { SetBit(GetByteRegister(L_REGISTER), 4); }; // SET 4, L
+void GB::OPCBE6() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	SetBit(data, 4);
+	WriteData(GetWordRegister(HL_REGISTER), data);
+	cycle += 8;
+};
+void GB::OPCBE7() { SetBit(GetByteRegister(A_REGISTER), 4); }; // SET 4, A
+void GB::OPCBE8() { SetBit(GetByteRegister(B_REGISTER), 5); }; // SET 5, B
+void GB::OPCBE9() { SetBit(GetByteRegister(C_REGISTER), 5); }; // SET 5, C
+void GB::OPCBEA() { SetBit(GetByteRegister(D_REGISTER), 5); }; // SET 5, D
+void GB::OPCBEB() { SetBit(GetByteRegister(E_REGISTER), 5); }; // SET 5, E
+void GB::OPCBEC() { SetBit(GetByteRegister(H_REGISTER), 5); }; // SET 5, H
+void GB::OPCBED() { SetBit(GetByteRegister(L_REGISTER), 5); }; // SET 5, L
+void GB::OPCBEE() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	SetBit(data, 5);
+	WriteData(GetWordRegister(HL_REGISTER), data);
+	cycle += 8;
+};
+void GB::OPCBEF() { SetBit(GetByteRegister(A_REGISTER), 5); }; // SET 5, A
+void GB::OPCBF0() { SetBit(GetByteRegister(B_REGISTER), 6); }; // SET 6, B
+void GB::OPCBF1() { SetBit(GetByteRegister(C_REGISTER), 6); }; // SET 6, C
+void GB::OPCBF2() { SetBit(GetByteRegister(D_REGISTER), 6); }; // SET 6, D
+void GB::OPCBF3() { SetBit(GetByteRegister(E_REGISTER), 6); }; // SET 6, E
+void GB::OPCBF4() { SetBit(GetByteRegister(H_REGISTER), 6); }; // SET 6, H
+void GB::OPCBF5() { SetBit(GetByteRegister(L_REGISTER), 6); }; // SET 6, L
+void GB::OPCBF6() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	SetBit(data, 6);
+	WriteData(GetWordRegister(HL_REGISTER), data);
+	cycle += 8;
+};
+void GB::OPCBF7() { SetBit(GetByteRegister(A_REGISTER), 6); }; // SET 6, A
+void GB::OPCBF8() { SetBit(GetByteRegister(B_REGISTER), 7); }; // SET 7, B
+void GB::OPCBF9() { SetBit(GetByteRegister(C_REGISTER), 7); }; // SET 7, C
+void GB::OPCBFA() { SetBit(GetByteRegister(D_REGISTER), 7); }; // SET 7, D
+void GB::OPCBFB() { SetBit(GetByteRegister(E_REGISTER), 7); }; // SET 7, E
+void GB::OPCBFC() { SetBit(GetByteRegister(H_REGISTER), 7); }; // SET 7, H
+void GB::OPCBFD() { SetBit(GetByteRegister(L_REGISTER), 7); }; // SET 7, L
+void GB::OPCBFE() 
+{
+	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
+	SetBit(data, 6);
+	WriteData(GetWordRegister(HL_REGISTER), data);
+	cycle += 8;
+};
+void GB::OPCBFF() { SetBit(GetByteRegister(A_REGISTER), 7); }; // SET 7, A
 
 
 //Stores all of the CPU Instructions into a single tidy array
