@@ -219,10 +219,11 @@ ui8& GB::ReadData(ui16 address)
 {
 	if (DEBUGGING)
 	{
-		if (address == 0xD81D)
-		{
-			std::cout << "hi" << std::endl;
-		}
+		//if (address == 0xD81D)
+		//{
+		//	std::cout << "hi" << std::endl;
+		//	std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;
+		//}
 
 	}
 	return m_bus[address];
@@ -258,6 +259,14 @@ ui16 GB::ReadWord()
 	highByte = ReadByte();
 
 	return data; //returns the Word
+}
+
+i8 GB::ReadSignedByte()
+{
+	i8 result = static_cast<i8>(*dynamicPtr);
+	cycle += 4; // Each read takes 1m / 4t
+	IncrementPC();
+	return result;
 }
 
 ui8& GB::GetByteRegister(ui8 reg)
@@ -379,7 +388,6 @@ void GB::PopStackPC()
 	GetWordRegister(SP_REGISTER)++;
 	high = ReadData(GetWordRegister(SP_REGISTER));
 	GetWordRegister(SP_REGISTER)++;
-	//SetWordRegister(PC_REGISTER, data);
 
 	cycle += 8;
 
@@ -450,7 +458,7 @@ void GB::Jr()
 	SetPC(newPC);
 }
 
-void GB::Jr(const ui8& address)
+void GB::Jr(const ui16& address)
 {
 	SetPC(address);
 }
@@ -482,10 +490,9 @@ void GB::ADDHL(const ui16& reg)
 
 void GB::Bit(const ui8& value, ui8 bit)
 {
-	ClearFlags();
-
 	SetFlag(FLAG_ZERO, ((value >> bit) & 0x01) == 0);
 	SetFlag(FLAG_HALFCARRY, true);
+	SetFlag(FLAG_SUBTRACT, false);
 }
 
 void GB::XOR(const ui8& value)
@@ -817,8 +824,8 @@ bool GB::TickCPU()
 		cycle = (normalCycles[OPCode] * 4);
 		cycles += cycle;
 
-		int address1 = 0xc856;
-		int address2 = 0xc86c;
+		int address1 = 0x206;
+		int address2 = 0x209;
 
 		//if (GetWordRegister(PC_REGISTER) == address1 /*&& GetWordRegister(PC_REGISTER) <= address2*/)
 		//{
@@ -835,13 +842,11 @@ bool GB::TickCPU()
 			(this->*CBCodes[OPCode])();
 			if (DEBUGGING)
 			{
-				if (GetWordRegister(PC_REGISTER) >= address1 && GetWordRegister(PC_REGISTER) <= address2)
-				{
-					OUTPUTCBREGISTERS(OPCode);
-					std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;
-				}
-
-				
+				//if (GetWordRegister(PC_REGISTER) >= address1 /*&& GetWordRegister(PC_REGISTER) <= address2*/)
+				//{
+				//	OUTPUTCBREGISTERS(OPCode);
+				//	std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;
+				//}
 				//OUTPUTCBREGISTERS(OPCode);
 			}
 
@@ -851,14 +856,11 @@ bool GB::TickCPU()
 			(this->*BASECodes[OPCode])();
 			if (DEBUGGING)
 			{
-				if (GetWordRegister(PC_REGISTER) >= address1 && GetWordRegister(PC_REGISTER) <= address2)
+				if (GetWordRegister(PC_REGISTER) >= address1 /*&& GetWordRegister(PC_REGISTER) <= address2*/)
 				{
-					OUTPUTREGISTERS(OPCode);
-					std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;
-
+					/*OUTPUTREGISTERS(OPCode);
+					std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;*/
 				}
-
-			
 				//OUTPUTCBREGISTERS(OPCode);
 			}
 
@@ -869,6 +871,18 @@ bool GB::TickCPU()
 	TickClock();
 	bool vSync = updatePixels();
 	//JoyPadTick();
+
+	if (IECycles > 0)
+	{
+		m_IECycles -= m_cycle;
+
+		if (m_IECycles <= 0)
+		{
+			m_IECycles = 0;
+			m_interrupts_enabled = true;
+		}
+	}
+
 	return vSync;
 }
 
@@ -1004,7 +1018,7 @@ void GB::CheckInterrupts()
 						SetPC(0x0060);
 						break;
 					default:
-						assert(0 && "Unqnown interupt");
+						assert(0 && "Unknown interupt");
 						break;
 					}
 
@@ -1403,7 +1417,7 @@ void GB::OPC0()
 	{
 		PopStackPC();
 	}
-	//cycle += 4;
+	cycle += 4;
 }; // RET NZ
 void GB::OPC1() { PopStack(BC_REGISTER); }; // POP BC
 void GB::OPC2() 
@@ -1426,7 +1440,11 @@ void GB::OPC4()
 }; // CALL NZ| ui16
 void GB::OPC5() { PushStack(BC_REGISTER); cycle += 4; }; // PUSH BC
 void GB::OPC6() { ADD(A_REGISTER, ReadByte()); }; // ADD A, ui8
-void GB::OPC7() {assert("Missing" && 0);};
+void GB::OPC7() 
+{
+	PushStack(PC_REGISTER);
+	SetPC(RESET_00);
+};
 void GB::OPC8() 
 {
 	if (CheckFlag(FLAG_ZERO))
@@ -1476,7 +1494,14 @@ void GB::OPD0()
 	cycle += 4;
 };
 void GB::OPD1() { PopStack(DE_REGISTER); }; // POP DE
-void GB::OPD2() {assert("Missing" && 0);};
+void GB::OPD2() 
+{
+	ui16 address = ReadWord();
+	if (!CheckFlag(FLAG_CARRY))
+	{
+		Jr(address);
+	}
+};
 void GB::OPD3() {assert("Missing" && 0);};
 void GB::OPD4() 
 {
@@ -1507,7 +1532,14 @@ void GB::OPD9()
 	PopStackPC();
 	interruptsEnabled = true;
 }; // RETI
-void GB::OPDA() {assert("Missing" && 0);};
+void GB::OPDA() 
+{
+	ui16 address = ReadWord();
+	if (CheckFlag(FLAG_CARRY))
+	{
+		Jr(address);
+	}
+};
 void GB::OPDB() {assert("Missing" && 0);};
 void GB::OPDC() 
 {
@@ -1532,10 +1564,14 @@ void GB::OPE3() {assert("Missing" && 0);};
 void GB::OPE4() {assert("Missing" && 0);};
 void GB::OPE5() { PushStack(HL_REGISTER); cycle += 4; }; // PUSH HL
 void GB::OPE6() { AND(ReadByte()); }; // AND A, ui8
-void GB::OPE7() {assert("Missing" && 0);};
+void GB::OPE7() 
+{
+	PushStack(PC_REGISTER);
+	SetPC(RESET_20);
+};
 void GB::OPE8() 
 {
-	i8 value = static_cast<i8>(*dynamicPtr);
+	i8 value = ReadSignedByte();
 
 	int result = GetWordRegister(SP_REGISTER) + value;
 
@@ -1550,10 +1586,16 @@ void GB::OPE8()
 	}
 
 	SetWordRegister(SP_REGISTER, static_cast<ui16>(result));
-	IncrementPC();
+
 	//TODO: doesn't inc pc on gbc?
 }; // ADD SP, i8
-void GB::OPE9() { SetPC(GetWordRegister(HL_REGISTER)); }; // JP HL
+void GB::OPE9() 
+{ 
+	ui16& address = GetWordRegister(HL_REGISTER);
+	//SetPCRegister(address);
+	SetWordRegister(PC_REGISTER, address);
+	dynamicPtr = &m_bus[address];
+}; // JP HL
 void GB::OPEA() { WriteData(ReadWord(), GetByteRegister(A_REGISTER)); cycle += 4; };  //LD (FF00+u8), A
 void GB::OPEB() {assert("Invalid CPU Instruction" && 0);};
 void GB::OPEC() {assert("Invalid CPU Instruction" && 0);};
@@ -1753,12 +1795,12 @@ void GB::OPCB5E()
 	Bit(data, 3); cycle += 4;
 }; // BIT (HL), 3
 void GB::OPCB5F() { Bit(GetByteRegister(A_REGISTER), 3); }; // BIT A, 3
-void GB::OPCB60() { Bit(GetByteRegister(B_REGISTER), 3); }; // BIT B, 4
-void GB::OPCB61() { Bit(GetByteRegister(C_REGISTER), 3); }; // BIT C, 4
-void GB::OPCB62() { Bit(GetByteRegister(D_REGISTER), 3); }; // BIT D, 4
-void GB::OPCB63() { Bit(GetByteRegister(E_REGISTER), 3); }; // BIT E, 4
-void GB::OPCB64() { Bit(GetByteRegister(H_REGISTER), 3); }; // BIT H, 4
-void GB::OPCB65() { Bit(GetByteRegister(L_REGISTER), 3); }; // BIT L, 4
+void GB::OPCB60() { Bit(GetByteRegister(B_REGISTER), 4); }; // BIT B, 4
+void GB::OPCB61() { Bit(GetByteRegister(C_REGISTER), 4); }; // BIT C, 4
+void GB::OPCB62() { Bit(GetByteRegister(D_REGISTER), 4); }; // BIT D, 4
+void GB::OPCB63() { Bit(GetByteRegister(E_REGISTER), 4); }; // BIT E, 4
+void GB::OPCB64() { Bit(GetByteRegister(H_REGISTER), 4); }; // BIT H, 4
+void GB::OPCB65() { Bit(GetByteRegister(L_REGISTER), 4); }; // BIT L, 4
 void GB::OPCB66() 
 {
 	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
@@ -1912,7 +1954,7 @@ void GB::OPCBBE()
 	WriteData(GetWordRegister(HL_REGISTER), data);
 	cycle += 8;
 };
-void GB::OPCBBF() { ClearBit(GetByteRegister(L_REGISTER), 7); }; // RES A, 7 
+void GB::OPCBBF() { ClearBit(GetByteRegister(A_REGISTER), 7); }; // RES A, 7 
 void GB::OPCBC0() { SetBit(GetByteRegister(B_REGISTER), 0); }; // SET 0, B
 void GB::OPCBC1() { SetBit(GetByteRegister(C_REGISTER), 0); }; // SET 0, C
 void GB::OPCBC2() { SetBit(GetByteRegister(D_REGISTER), 0); }; // SET 0, D
@@ -2020,7 +2062,7 @@ void GB::OPCBFD() { SetBit(GetByteRegister(L_REGISTER), 7); }; // SET 7, L
 void GB::OPCBFE() 
 {
 	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
-	SetBit(data, 6);
+	SetBit(data, 7);
 	WriteData(GetWordRegister(HL_REGISTER), data);
 	cycle += 8;
 };

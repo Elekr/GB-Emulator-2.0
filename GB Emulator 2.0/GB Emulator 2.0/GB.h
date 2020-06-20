@@ -14,28 +14,28 @@ typedef signed __int16 i16;
 
 const int windowMultiplier = 4;
 
-const int A_REGISTER = 1;
-const int F_REGISTER = 0;
-const int B_REGISTER = 3; //Lower bits
-const int C_REGISTER = 2; //Upper bits
-const int D_REGISTER = 5;
-const int E_REGISTER = 4;
-const int H_REGISTER = 7;
-const int L_REGISTER = 6;
+const ui8 A_REGISTER = 1;
+const ui8 F_REGISTER = 0;
+const ui8 B_REGISTER = 3; //Lower bits
+const ui8 C_REGISTER = 2; //Upper bits
+const ui8 D_REGISTER = 5;
+const ui8 E_REGISTER = 4;
+const ui8 H_REGISTER = 7;
+const ui8 L_REGISTER = 6;
 
 //16-bit registers
-const int AF_REGISTER = 0;
-const int BC_REGISTER = 1;
-const int DE_REGISTER = 2;
-const int HL_REGISTER = 3;
-const int PC_REGISTER = 4;
-const int SP_REGISTER = 5;
+const ui8 AF_REGISTER = 0;
+const ui8 BC_REGISTER = 1;
+const ui8 DE_REGISTER = 2;
+const ui8 HL_REGISTER = 3;
+const ui8 PC_REGISTER = 4;
+const ui8 SP_REGISTER = 5;
 
 //**** Bits used to control flags in the F register http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf
-const int FLAG_ZERO = 7; // Z
-const int FLAG_SUBTRACT = 6; // N
-const int FLAG_HALFCARRY = 5; // H
-const int FLAG_CARRY = 4; // C
+const ui8 FLAG_ZERO = 7; // Z
+const ui8 FLAG_SUBTRACT = 6; // N
+const ui8 FLAG_HALFCARRY = 5; // H
+const ui8 FLAG_CARRY = 4; // C
 
 enum CPUInterupt
 {
@@ -249,6 +249,7 @@ public:
 
     //**** Interrupts
     bool interruptsEnabled = false;
+    int IECycles = 0;
 
     //**** HALT
     int m_haltDissableCycles;
@@ -260,22 +261,23 @@ public:
     void addBIOS();
     void Reset();
 
-    void WriteData(ui16 address, ui8 data); /////
-    ui8& ReadData(ui16 address);/////
+    void WriteData(ui16 address, ui8 data); 
+    ui8& ReadData(ui16 address);
     bool InMemoryRange(ui16 start, ui16 end, ui16 address);
 
-    ui8 ReadByte(); /////////
-    ui16 ReadWord();/////////
+    ui8 ReadByte(); 
+    ui16 ReadWord();
+    i8 ReadSignedByte();
 
-    ui8& GetByteRegister(ui8 reg); //!
-    ui16& GetWordRegister(ui8 reg);//!
+    ui8& GetByteRegister(ui8 reg); 
+    ui16& GetWordRegister(ui8 reg);
     //** SET
-    void SetByteRegister(ui8 reg, ui8 value); //!
-    void SetWordRegister(ui8 reg, ui16 value); //!
+    void SetByteRegister(ui8 reg, ui8 value); 
+    void SetWordRegister(ui8 reg, ui16 value); 
 
-    ui8 ReadNextCode(); //!
-    void IncrementPC(); //!
-    inline void SetPC(const ui16& value); //////
+    ui8 ReadNextCode(); 
+    void IncrementPC(); 
+    inline void SetPC(const ui16& value); 
 
     //**** BITS
     bool HasBit(ui8& data, ui8 bit); //used for the Display potentially can change check flag around 
@@ -297,7 +299,7 @@ public:
     //**** JUMPS
     void Jr();
 
-    void Jr(const ui8& address);
+    void Jr(const ui16& address);
 
     void ADDHL(const ui16& reg);
 
