@@ -790,13 +790,13 @@ bool GB::TickCPU()
 	{
 		cycle = 4;
 
-		if (m_haltDissableCycles > 0)
+		if (haltDissableCycles > 0)
 		{
-			m_haltDissableCycles -= cycle;
+			haltDissableCycles -= cycle;
 
-			if (m_haltDissableCycles <= 0)
+			if (haltDissableCycles <= 0)
 			{
-				m_haltDissableCycles == 0;
+				haltDissableCycles == 0;
 				halt = false;
 			}
 
@@ -810,15 +810,15 @@ bool GB::TickCPU()
 
 			if (halt && interuptsToProcess > 0)
 			{
-				m_haltDissableCycles = 16;
+				haltDissableCycles = 16;
 			}
 		}
 	}
 
 	if (!halt)
 	{
-		OPCode = ReadNextCode();
 		CheckInterrupts();
+		OPCode = ReadNextCode();
 
 
 		cycle = (normalCycles[OPCode] * 4);
@@ -832,7 +832,7 @@ bool GB::TickCPU()
 		//	DEBUGGING = true;
 		//}
 
-		if (OPCode == 0xCB) // Extra Codes
+		if (OPCode == 0xCB) // Secondary Codes
 		{
 			OPCode = ReadNextCode();
 
@@ -874,12 +874,12 @@ bool GB::TickCPU()
 
 	if (IECycles > 0)
 	{
-		m_IECycles -= m_cycle;
+		IECycles -= cycle;
 
-		if (m_IECycles <= 0)
+		if (IECycles <= 0)
 		{
-			m_IECycles = 0;
-			m_interrupts_enabled = true;
+			IECycles = 0;
+			interruptsEnabled = true;
 		}
 	}
 
@@ -1132,6 +1132,7 @@ void GB::OP25() { DECByteRegister(H_REGISTER); }; // DEC H
 void GB::OP26() { SetByteRegister(H_REGISTER, ReadByte()); }; // LD H, ui8
 void GB::OP27() 
 {
+//https://www.reddit.com/r/EmuDev/comments/6wge9z/some_help_debugging_blarggs_game_boy_test_roms/ Info on DAA function
 	int a_reg = GetByteRegister(A_REGISTER);
 
 	if (!CheckFlag(FLAG_SUBTRACT))
@@ -1647,7 +1648,12 @@ void GB::OPF9() { SetWordRegister(SP_REGISTER, GetWordRegister(HL_REGISTER)); cy
 void GB::OPFA() { SetByteRegister(A_REGISTER, ReadData(ReadWord())); cycle += 4; }; // LD A, (u16)
 void GB::OPFB()
 {
-	interruptsEnabled = true; //Enables interrupts (presumably mode 1 on the z80?) http://jgmalcolm.com/z80/advanced/im1i
+	//interruptsEnabled = true; 
+	//Enables interrupts (presumably mode 1 on the z80?) http://jgmalcolm.com/z80/advanced/im1i // Definitely not how it works
+ //http://imrannazar.com/GameBoy-Emulation-in-JavaScript:-Interrupts Fetch Decode Execute in more detail
+
+	IECycles = 4 + 1;
+
 } // EI
 void GB::OPFC() { assert(0 && "Invalid CPU"); };
 void GB::OPFD() { assert(0 && "Invalid CPU"); };
@@ -3249,7 +3255,7 @@ void GB::RenderSprites()
 					{
 						int pixelIndex = pixel + (DISPLAY_WIDTH * line);
 						//TODO: check if the sprite is on top
-						pixelRGB colour = classicPallette[(pallette, colours(colourNum))];
+						pixelRGB colour = currentPallete[(pallette, colours(colourNum))];
 						//Store them in the framebuffer
 						frameBuffer[pixelIndex * 4] = colour.blue;
 						frameBuffer[pixelIndex * 4 + 1] = colour.green;

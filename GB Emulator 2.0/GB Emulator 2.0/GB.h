@@ -252,7 +252,7 @@ public:
     int IECycles = 0;
 
     //**** HALT
-    int m_haltDissableCycles;
+    int haltDissableCycles;
     bool halt = false;
 
     GB();
@@ -379,7 +379,7 @@ public:
     SDL_Window* window;
     SDL_Renderer* render;
     SDL_Texture* screen_texture;
-    pixelRGB* currentPallete = greyPallette;
+    pixelRGB* currentPallete = classicPallette;
     pixelRGB classicPallette[4] = { { 155,188,15 }, { 139,172,15 }, { 48,98,48 }, { 15,56,15 } };
     pixelRGB greyPallette[4] = { { 255,255,255 },{ 0xCC,0xCC,0xCC },{ 0x77,0x77,0x77 }, { 0x0,0x0,0x0 } };
 
@@ -467,7 +467,7 @@ public:
     void OP24(); // INC H
     void OP25(); // DEC H
     void OP26(); // LD H, ui8
-    void OP27(); //
+    void OP27(); // DAA
     void OP28(); // JR Z, i8
     void OP29(); // ADD HL, HL
     void OP2A(); // LD A, (HL+)
