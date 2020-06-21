@@ -17,6 +17,7 @@ bool GB::InitEMU(const char* path)
 	bool loaded = m_cartridge.Load(path);
 	if (!loaded)return false;
 	memcpy(m_bus, m_cartridge.GetRawData(), 0x8000);
+	addBIOS();
 	return true;
 }
 
@@ -2809,6 +2810,61 @@ void GB::UpdateJoyPad()
 	bus.io.joypad = current;
 }
 
+void GB::KeyPress(int key)
+{
+	ClearBit(joypadActual, key);
+}
+
+void GB::KeyRelease(int key)
+{
+	SetBit(joypadActual, key);
+}
+
+void GB::HandleInput(SDL_Event& event)
+{
+	if (event.type == SDL_KEYDOWN) //If a key has been pressed on the gameboy
+	{
+		int key = -1;
+		switch (event.key.keysym.sym)
+		{
+		case SDLK_z:        key = A;    break;
+		case SDLK_x:        key = B;    break;
+		case SDLK_RETURN:   key = START;    break;
+		case SDLK_SPACE:    key = SELECT;    break;
+		case SDLK_RIGHT:    key = RIGHT;    break;
+		case SDLK_LEFT:     key = LEFT;    break;
+		case SDLK_UP:       key = UP;    break;
+		case SDLK_DOWN:     key = DOWN;    break;
+		default:            key = -1;   break;
+		}
+		if (key != -1)
+		{
+			KeyPress(key);
+		}
+	}
+	else if (event.type == SDL_KEYUP)
+	{
+		int key = -1;
+
+		switch (event.key.keysym.sym)
+		{
+		case SDLK_z:        key = 4;    break;
+		case SDLK_x:        key = 5;    break;
+		case SDLK_RETURN:   key = 7;    break;
+		case SDLK_SPACE:    key = 6;    break;
+		case SDLK_RIGHT:    key = 0;    break;
+		case SDLK_LEFT:     key = 1;    break;
+		case SDLK_UP:       key = 2;    break;
+		case SDLK_DOWN:     key = 3;    break;
+		default:            key = -1;   break;
+		}
+		if (key != -1)
+		{
+			KeyRelease(key);
+		}
+	}
+}
+
 bool GB::createSDLWindow()
 {
 	//if (SDL_Init(SDL_INIT_EVERYTHING) < 0)
@@ -3332,6 +3388,18 @@ void GB::RenderTile(bool unsig, ui16 tileMap, ui16 tileData, ui8 xPos, ui8 yPos,
 	frameBuffer[pixelIndex * 4] = colour.blue;
 	frameBuffer[pixelIndex * 4 + 1] = colour.green;
 	frameBuffer[pixelIndex * 4 + 2] = colour.red;
+}
+
+void GB::switchPallete()
+{
+	if (currentPallete == classicPallette)
+	{
+		currentPallete = greyPallette;
+	}
+	else if (currentPallete == greyPallette)
+	{
+		currentPallete = classicPallette;
+	}
 }
 
 colours GB::getColourFromPallette(ui8 pallete, colours originalColour)

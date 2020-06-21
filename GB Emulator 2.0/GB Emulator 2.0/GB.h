@@ -118,6 +118,18 @@ const ui16 m_timer_controll_address = 0xFF07;
 
 const int joypadCyclesRefresh = 65536;
 
+enum JoyPad
+{
+    RIGHT = 0,
+    LEFT = 1,
+    UP = 2,
+    DOWN = 3,
+    A = 4,
+    B = 5,
+    SELECT = 6,
+    START = 7
+};
+
 //**************************************************** Display
 
 const int DISPLAY_HEIGHT = 144;
@@ -374,8 +386,18 @@ public:
     void JoyPadTick();
     void UpdateJoyPad();
 
+    void KeyPress(int key);
+    void KeyRelease(int key);
+
+
+    void HandleInput(SDL_Event& event);
+
+    //**** SDL Events https://wiki.libsdl.org/SDL_Keycode
+    //https://stackoverflow.com/questions/3741055/inputs-in-sdl-on-key-pressed
+
+
     //*************************************************************** Display
-    //**** SDL
+    //**** SDL Window
     SDL_Window* window;
     SDL_Renderer* render;
     SDL_Texture* screen_texture;
@@ -416,6 +438,7 @@ public:
     void RenderWindow(ui8 windowY);
     void RenderSprites();
     void RenderTile(bool unsig, ui16 tileMap, ui16 tileData, ui8 xPos, ui8 yPos, ui8 pixel, ui8 pallette);
+    void switchPallete();
     colours getColourFromPallette(ui8 pallete, colours originalColour);
 
     void DMATransfer(const ui8 data);

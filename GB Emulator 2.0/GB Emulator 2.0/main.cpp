@@ -2,11 +2,14 @@
 #include "Cartridge.h"
 #include "GB.h"
 
+bool windowOpen = false;
+
+void PollWindow();
+
 int main(int argc, char* argv[])
 {
-	bool windowOpen = true;
 	GB* gameboy = new GB();
-	gameboy->createSDLWindow();
+	windowOpen = gameboy->createSDLWindow();
 
 	//TODO:
 	//JOYPAD INPUT
@@ -17,7 +20,7 @@ int main(int argc, char* argv[])
 	//**** GAMES
 	gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/DrMario.gb");
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Tetris.gb"); 
-	//https://fladnag.net/downloads/telephone/palm/APPS/Liberty1.25/rom2pdb.c Fix for tetris 
+	//https://fladnag.net/downloads/telephone/palm/APPS/Liberty1.25/rom2pdb.c Fix for tetris (If interrupts are not implemented)
 	//https://www.reddit.com/r/EmuDev/comments/6sxb09/gb_tetris_stuck_at_copyright_screen/ // Tetris bugs intentional
 
 	//**** TESTS
@@ -34,10 +37,31 @@ int main(int argc, char* argv[])
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/cpu_individual/11-op a,(hl).gb"); // PASSED
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/cpu_individual/cpu_instrs.gb"); // FAILS repeats consistently? timing issue?
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/cpu_instrs.gb");
-	gameboy->addBIOS();
 
 	while (windowOpen)
 	{
+		SDL_Event event;
+		while (SDL_PollEvent(&event))
+		{
+			gameboy->HandleInput(event);
+			switch (event.type)
+			{
+			case SDL_KEYDOWN:
+				if (event.key.keysym.sym == SDLK_ESCAPE)
+				{
+					windowOpen = false;
+				}
+				if (event.key.keysym.sym == SDLK_F1)
+				{
+					gameboy->switchPallete();
+				}
+			}
+
+			if (event.type == SDL_QUIT) //TODO: ask why need this
+			{
+				windowOpen = false;
+			}
+		}
 		gameboy->NextFrame();
 	}
 	return 0;
