@@ -30,6 +30,60 @@ void GB::addBIOS()
 	}
 }
 
+void GB::SkipBIOS()
+{
+	for (int i = 0x0000; i < 0xFFFF; i++)
+	{
+		m_bus[i] = 0x0;
+	}
+
+	memcpy(m_bus, m_cartridge.GetRawData(), 0x8000);
+
+	interruptsEnabled = false;
+
+	m_bus[0xFF05] = 0x00;
+	m_bus[0xFF06] = 0x00;
+	m_bus[0xFF07] = 0x00;
+	m_bus[0xFF0F] = 0xE1;
+	m_bus[0xFF10] = 0x80;
+	m_bus[0xFF11] = 0xBF;
+	m_bus[0xFF12] = 0xF3;
+	m_bus[0xFF14] = 0xBF;
+	m_bus[0xFF16] = 0x3F;
+	m_bus[0xFF17] = 0x00;
+	m_bus[0xFF19] = 0xBF;
+	m_bus[0xFF1A] = 0x7F;
+	m_bus[0xFF1B] = 0xFF;
+	m_bus[0xFF1C] = 0x9F;
+	m_bus[0xFF1E] = 0xBF;
+	m_bus[0xFF20] = 0xFF;
+	m_bus[0xFF21] = 0x00;
+	m_bus[0xFF22] = 0x00;
+	m_bus[0xFF23] = 0xBF;
+	m_bus[0xFF24] = 0x77;
+	m_bus[0xFF25] = 0xF3;
+	m_bus[0xFF26] = 0xF1;
+	m_bus[0xFF40] = 0x91;
+	m_bus[0xFF42] = 0x00;
+	m_bus[0xFF43] = 0x00;
+	m_bus[0xFF45] = 0x00;
+	m_bus[0xFF47] = 0xFC;
+	m_bus[0xFF48] = 0xFF;
+	m_bus[0xFF49] = 0xFF;
+	m_bus[0xFF4A] = 0x00;
+	m_bus[0xFF4B] = 0x00;
+	m_bus[0xFFFF] = 0x00;
+
+	SetWordRegister(SP_REGISTER, 0xFFFE);
+	SetWordRegister(AF_REGISTER, 0x01B0); // Gameboy
+	SetWordRegister(BC_REGISTER, 0x0013);
+	SetWordRegister(DE_REGISTER, 0x00D8);
+	SetWordRegister(HL_REGISTER, 0x014D);
+
+	SetPC(0x100);
+
+}
+
 void GB::Reset()
 {
 	SetWordRegister(SP_REGISTER, 0x0000);
@@ -113,9 +167,32 @@ void GB::WriteData(ui16 address, ui8 data)
 			m_bus[address] = 0x0;
 			break;
 		}
+		case 0xFF05: // Timer divider
+		{
+			if (DEBUGGING)
+			{
+				std::cout << "Tima " << std::hex << (int)data << std::endl;
+			}
+			m_bus[address] = data;
+			break;
+		}
 		case 0xFF07: // Timer Control
 		{
+			if (DEBUGGING)
+			{
+				std::cout << "Timer Control "  << std::hex << (int)data << std::endl;
+				std::cout << "Timer Control PC" << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;
+			}
 			SetTimerControl(data);
+			break;
+		}
+		case 0xFF0F: // IF
+		{
+			if (DEBUGGING)
+			{
+				std::cout << "IF register " << std::hex << (int)data << std::endl;
+			}
+			m_bus[address] = data;
 			break;
 		}
 		case 0xFF40: // Video Control
@@ -129,8 +206,6 @@ void GB::WriteData(ui16 address, ui8 data)
 			{
 				DisableLCD();
 			}
-
-			
 			break;
 		}
 		case 0xFF44: // Video Line Val. Reset if wrote too
@@ -155,8 +230,7 @@ void GB::WriteData(ui16 address, ui8 data)
 				else
 				{
 					std::cout << "Booted Successfully" << std::endl;
-					DEBUGGING = true;
-				/*	std::cout << std::hex << (int)m_bus[0x2f0] << std::endl;*/
+					//DEBUGGING = true;
 
 					//ui8* cartridgeMemory = m_cartridge.GetRawData();
 					//for (int i = 0; i < BIOS_SIZE; i++)
@@ -218,15 +292,6 @@ void GB::WriteData(ui16 address, ui8 data)
 
 ui8& GB::ReadData(ui16 address)
 {
-	if (DEBUGGING)
-	{
-		//if (address == 0xD81D)
-		//{
-		//	std::cout << "hi" << std::endl;
-		//	std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;
-		//}
-
-	}
 	return m_bus[address];
 }
 
@@ -296,15 +361,29 @@ ui8 GB::ReadNextCode()
 {
 	ui8 result = *dynamicPtr;
 	cycle += 4;
-	IncrementPC();
-	//TODO: HALT BUG STUFF
+
+	if (!haltBug)
+	{
+		IncrementPC();
+	}
+	else
+	{
+		// If we have the halt bug, stay where we are and dont inc
+		haltBug = false;
+	}
 	return result;
 }
 
 void GB::IncrementPC()
 {
-	GetWordRegister(PC_REGISTER)++; //Increments the PC register by 1
-	dynamicPtr++; //Moves the busPtr along one
+	GetWordRegister(PC_REGISTER)++;
+	dynamicPtr++; //Moves the pointer
+}
+
+void GB::DecrementPC()
+{
+	GetWordRegister(PC_REGISTER)--;
+	dynamicPtr--; //Move the pointer
 }
 
 inline void GB::SetPC(const ui16& value)
@@ -776,7 +855,7 @@ void GB::SRL(ui8& value)
 	SetFlag(FLAG_ZERO, value == 0);
 }
 
-void GB::NextFrame()
+void GB::Frame()
 {
 	while(!TickCPU());
 	cycles = 0;
@@ -821,12 +900,10 @@ bool GB::TickCPU()
 		CheckInterrupts();
 		OPCode = ReadNextCode();
 
-
-		cycle = (normalCycles[OPCode] * 4);
 		cycles += cycle;
 
-		int address1 = 0x206;
-		int address2 = 0x209;
+		int address1 = 0xc33c;
+		int address2 = 0xc342;
 
 		//if (GetWordRegister(PC_REGISTER) == address1 /*&& GetWordRegister(PC_REGISTER) <= address2*/)
 		//{
@@ -837,30 +914,33 @@ bool GB::TickCPU()
 		{
 			OPCode = ReadNextCode();
 
-			cycle = (CBCycles[OPCode] * 4);
-			cycles += cycle;
-
+			//cycle = (CBCycles[OPCode] * 4);
 			(this->*CBCodes[OPCode])();
 			if (DEBUGGING)
 			{
-				//if (GetWordRegister(PC_REGISTER) >= address1 /*&& GetWordRegister(PC_REGISTER) <= address2*/)
-				//{
-				//	OUTPUTCBREGISTERS(OPCode);
-				//	std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;
-				//}
+				if (GetWordRegister(PC_REGISTER) >= address1 && GetWordRegister(PC_REGISTER) <= address2)
+				{
+					OUTPUTCBREGISTERS(OPCode);
+					std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;
+				}
 				//OUTPUTCBREGISTERS(OPCode);
 			}
 
 		}
 		else
 		{
+			//cycle = (normalCycles[OPCode] * 4);
 			(this->*BASECodes[OPCode])();
 			if (DEBUGGING)
 			{
-				if (GetWordRegister(PC_REGISTER) >= address1 /*&& GetWordRegister(PC_REGISTER) <= address2*/)
+				if (GetWordRegister(PC_REGISTER) >= address1 && GetWordRegister(PC_REGISTER) <= address2)
 				{
-					/*OUTPUTREGISTERS(OPCode);
-					std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;*/
+					if (GetWordRegister(SP_REGISTER) == 0xdfe7)
+					{
+						OUTPUTREGISTERS(OPCode);
+						std::cout << std::hex << (int)GetWordRegister(PC_REGISTER) << std::endl;
+					}
+
 				}
 				//OUTPUTCBREGISTERS(OPCode);
 			}
@@ -871,7 +951,7 @@ bool GB::TickCPU()
 	
 	TickClock();
 	bool vSync = updatePixels();
-	//JoyPadTick();
+	JoyPadTick();
 
 	if (IECycles > 0)
 	{
@@ -884,22 +964,25 @@ bool GB::TickCPU()
 		}
 	}
 
+	cycles += cycle;
+
 	return vSync;
 }
 
 void GB::TickClock()
 {
-	divCounter += cycles;
+	//https://hacktix.github.io/GBEDG/timers/
+	deviderCounter += cycle;
 
-	ui8 timer_control = ReadData(m_timer_controll_address);
-	ui8 timer = ReadData(m_timer_address);
-	ui8 timer_modulo = ReadData(m_timer_modulo_address);
+	ui8& timer_control = ReadData(m_timer_controll_address);
+	ui8& timer = ReadData(m_timer_address);
+	ui8& timer_modulo = ReadData(m_timer_modulo_address);
 
 	if (HasBit(timer_control, 2)) //If the timer is enabled
 	{
 		timerCounter += cycle;
 
-		ClockFrequency();
+		ClockFrequency(); //Sets the clockFreq
 
 		//Incrementing the timer register
 		while (timerCounter >= clockFreq)
@@ -908,7 +991,6 @@ void GB::TickClock()
 			if (timer == 0xFF)
 			{
 				timer = timer_modulo;
-
 				RequestInterupt(TIMER);
 			}
 			else
@@ -919,9 +1001,9 @@ void GB::TickClock()
 	}
 
 	//Incrementing the divider register
-	while (divCounter >= 256)
+	if (deviderCounter >= 256)
 	{
-		divCounter -= 256;
+		deviderCounter -= 256;
 
 		ReadData(m_timer_divider_address)++;
 	}
@@ -997,7 +1079,6 @@ void GB::CheckInterrupts()
 			{
 				if (HasBit(interupt_flags, i))
 				{
-					interruptsEnabled = false; // Since we are now in a interrupt we need to disable future ones
 					halt = false;
 					ClearBit(interupt_flags, i);
 					PushStack(PC_REGISTER); //Store PC
@@ -1334,11 +1415,26 @@ void GB::OP74() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(H_REGI
 void GB::OP75() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(L_REGISTER)); cycle += 4; }; // LD (HL), L
 void GB::OP76() 
 {
-	halt = true;
+	if (IECycles > 0)
+	{
+		IECycles = 0;
+		interruptsEnabled = true;
+		DecrementPC();
+	}
+	else
+	{
+		halt = true;
 
-	/* Check for halt bug */
-	ui8 interruptEnabledFlag = ReadData(m_interrupt_enabled_flag_address);
-	ui8 interruptFlag = ReadData(m_cpu_interupt_flag_address);
+		/* Check for halt bug */
+		ui8 interruptEnabledFlag = ReadData(m_interrupt_enabled_flag_address);
+		ui8 interruptFlag = ReadData(m_cpu_interupt_flag_address);
+
+		// When interupts are dissabled HALT skips a pc instruction, we dont want this
+		if (!interruptsEnabled && (interruptFlag & interruptEnabledFlag & 0x1F))
+		{
+			haltBug = true;
+		}
+	}
 }; // HALT
 void GB::OP77() { WriteData(GetWordRegister(HL_REGISTER), GetByteRegister(A_REGISTER)); cycle += 4; }; // LD (HL), A
 void GB::OP78() { SetByteRegister(A_REGISTER, GetByteRegister(B_REGISTER)); }; // LD A, B
@@ -1464,7 +1560,7 @@ void GB::OPCA()
 		Jr(address);
 	}
 }; // JP Z, u16
-void GB::OPCB() {assert("Missing" && 0);};
+void GB::OPCB() {}; // Used to swap to secondary codes
 void GB::OPCC() 
 {
 	ui16 word = ReadWord();
@@ -1504,7 +1600,7 @@ void GB::OPD2()
 		Jr(address);
 	}
 };
-void GB::OPD3() {assert("Missing" && 0);};
+void GB::OPD3() {assert("Invalid CPU Instruction" && 0);};
 void GB::OPD4() 
 {
 	ui16 word = ReadWord();
@@ -1542,7 +1638,7 @@ void GB::OPDA()
 		Jr(address);
 	}
 };
-void GB::OPDB() {assert("Missing" && 0);};
+void GB::OPDB() {assert("Invalid CPU Instruction" && 0);};
 void GB::OPDC() 
 {
 	ui16 word = ReadWord();
@@ -1562,10 +1658,10 @@ void GB::OPDF()
 void GB::OPE0() { WriteData(static_cast<ui16> (0xFF00 + ReadByte()), GetByteRegister(A_REGISTER)); cycle += 4; }; // LD (FF00+UI8), A
 void GB::OPE1() { PopStack(HL_REGISTER); }; // POP HL
 void GB::OPE2() { WriteData(static_cast<ui16> (0xFF00 + GetByteRegister(C_REGISTER)), GetByteRegister(A_REGISTER)); cycle += 4; }; // LD (FF00 + C), A
-void GB::OPE3() {assert("Missing" && 0);};
-void GB::OPE4() {assert("Missing" && 0);};
+void GB::OPE3() {assert("Invalid CPU Instruction" && 0);};
+void GB::OPE4() {assert("Invalid CPU Instruction" && 0);};
 void GB::OPE5() { PushStack(HL_REGISTER); cycle += 4; }; // PUSH HL
-void GB::OPE6() { AND(ReadByte()); }; // AND A, ui8
+void GB::OPE6() { AND(ReadByte());}; // AND A, ui8
 void GB::OPE7() 
 {
 	PushStack(PC_REGISTER);
@@ -1589,7 +1685,8 @@ void GB::OPE8()
 
 	SetWordRegister(SP_REGISTER, static_cast<ui16>(result));
 
-	//TODO: doesn't inc pc on gbc?
+	cycle += 8;
+
 }; // ADD SP, i8
 void GB::OPE9() 
 { 
@@ -1626,8 +1723,7 @@ void GB::OPF7()
 }; // RST 30h
 void GB::OPF8() 
 {
-	i8 n = static_cast<i8>(*dynamicPtr);
-	//i8 n = ReadSignedByteFromPC();
+	i8 n = ReadSignedByte();
 	ui16 result = GetWordRegister(SP_REGISTER) + n;
 
 	ClearFlags();
@@ -1641,9 +1737,10 @@ void GB::OPF8()
 	}
 
 	SetWordRegister(HL_REGISTER, result);
-	IncrementPC();
 
-	//TODO: again why incpc
+	cycle += 4;
+
+
 }; // LD HL, SP+i8
 void GB::OPF9() { SetWordRegister(SP_REGISTER, GetWordRegister(HL_REGISTER)); cycle += 4; };
 void GB::OPFA() { SetByteRegister(A_REGISTER, ReadData(ReadWord())); cycle += 4; }; // LD A, (u16)
@@ -1677,6 +1774,7 @@ void GB::OPCB06()
 	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
 	RLC(data, false);
 	WriteData(GetWordRegister(HL_REGISTER), data);
+	cycle += 8;
 }; //RLC (HL)
 void GB::OPCB07() { RLC(GetByteRegister(A_REGISTER), false); }; // RLC, A
 void GB::OPCB08() { RRC(GetByteRegister(B_REGISTER), false); }; // RRC B
@@ -1690,6 +1788,7 @@ void GB::OPCB0E()
 	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
 	RRC(data, false);
 	WriteData(GetWordRegister(HL_REGISTER), data);
+	cycle += 8;
 }; // RRC (HL)
 void GB::OPCB0F() { RRC(GetByteRegister(A_REGISTER), false); }; // RRC A
 void GB::OPCB10() { RL(GetByteRegister(B_REGISTER), false); }; // RL, B
@@ -1812,6 +1911,7 @@ void GB::OPCB66()
 {
 	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
 	Bit(data, 4);
+	cycle += 4;
 }; // BIT (HL), 4
 void GB::OPCB67() { Bit(GetByteRegister(A_REGISTER), 4); }; // BIT A, 4
 void GB::OPCB68() { Bit(GetByteRegister(B_REGISTER), 5); };	// BIT B, 5
@@ -1823,7 +1923,8 @@ void GB::OPCB6D() { Bit(GetByteRegister(L_REGISTER), 5); };	// BIT L, 5
 void GB::OPCB6E() 
 {
 	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
-	Bit(data, 5); cycle += 4; 
+	Bit(data, 5); 
+	cycle += 4; 
 }; // BIT (HL), 5
 void GB::OPCB6F() { Bit(GetByteRegister(A_REGISTER), 5); }; // BIT A, 5
 void GB::OPCB70() { Bit(GetByteRegister(B_REGISTER), 6); }; // BIT B, 6
@@ -1849,6 +1950,7 @@ void GB::OPCB7E()
 {
 	ui8& data = ReadData(GetWordRegister(HL_REGISTER));
 	Bit(data, 7);
+	cycle += 4;
 }; //BIT (HL), 7
 void GB::OPCB7F() { Bit(GetByteRegister(A_REGISTER), 7); }; // BIT A, 7
 void GB::OPCB80() { ClearBit(GetByteRegister(B_REGISTER), 0) ;}; // RES B, 0
@@ -2676,6 +2778,14 @@ void GB::OUTPUTREGISTERS(ui8 op)
 
 	std::cout << "0xFF00 is ";
 	PrintHex(m_bus[0xFF00]);
+	std::cout << "                   0xFF0f is ";
+	PrintHex(m_bus[0xFF0f]);
+	std::cout << std::endl;
+
+	std::cout << "0xFF07 is ";
+	PrintHex(m_bus[0xFF07]);
+	std::cout << "                   0xFF05 is ";
+	PrintHex(m_bus[0xFF05]);
 	std::cout << std::endl;
 
 	std::cout << std::bitset<8>(register8bit[F_REGISTER]) << "<- Flags" << std::endl;
@@ -2760,6 +2870,14 @@ void GB::OUTPUTCBREGISTERS(ui8 op)
 
 	std::cout << "0xFF00 is ";
 	PrintHex(m_bus[0xFF00]);
+	std::cout << "                   0xFF0f is ";
+	PrintHex(m_bus[0xFF0f]);
+	std::cout << std::endl;
+
+	std::cout << "0xFF07 is ";
+	PrintHex(m_bus[0xFF07]);
+	std::cout << "                   0xFF05 is ";
+	PrintHex(m_bus[0xFF05]);
 	std::cout << std::endl;
 
 	std::cout << std::bitset<8>(register8bit[F_REGISTER]) << std::endl;
@@ -2812,6 +2930,12 @@ void GB::UpdateJoyPad()
 
 void GB::KeyPress(int key)
 {
+	//bool previouslyUnset = false;
+
+	//if (!HasBit(joypadActual, key))
+	//{
+	//	previouslyUnset = true;
+	//}
 	ClearBit(joypadActual, key);
 }
 
@@ -2919,20 +3043,9 @@ bool GB::updatePixels()
 
 	vBlank = false;
 
-	videoCycles += cycle; //update the cycles (time passed) from the CPU
-
-	//if (lcdEnabled)
-	//{
-	//	std::cout << "enabled" << std::endl;
-	//}
-	//else
-	//{
-	//	std::cout << "disabled" << std::endl;
-	//}
-
 	if (isDisplayEnabled && lcdEnabled)
 	{
-
+		videoCycles += cycle; //update the cycles (time passed) from the CPU
 		switch (currentMode)
 		{
 		case 0:
@@ -2946,7 +3059,7 @@ bool GB::updatePixels()
 		break;
 		case 1: 
 		{
-			handleVBlankMode(line, cycles);
+			handleVBlankMode(line, cycle);
 		}
 		break;
 		case 2:
@@ -3120,18 +3233,8 @@ void GB::handleLCDTransferMode()
 
 void GB::RenderGame()
 {
-	//SDL_UpdateTexture(screen_texture, NULL, frameBuffer, DISPLAY_WIDTH * sizeof(SDL_Colour));
-	//SDL_RenderCopy(render, screen_texture, NULL, NULL);
-	//SDL_RenderPresent(render);
-
-	void* pixels_ptr;
-	int pitch;
-	SDL_LockTexture(screen_texture, nullptr, &pixels_ptr, &pitch);
-
-	char* pixels = static_cast<char*>(pixels_ptr);
-
-	memcpy(pixels, frameBuffer, DISPLAY_WIDTH * DISPLAY_HEIGHT * 4);
-	SDL_UnlockTexture(screen_texture);
+	SDL_UpdateTexture(screen_texture, NULL, this->frameBuffer, DISPLAY_WIDTH * 4);
+	SDL_RenderClear(render);
 	SDL_RenderCopy(render, screen_texture, nullptr, nullptr);
 	SDL_RenderPresent(render);
 }
@@ -3148,12 +3251,6 @@ void GB::RenderBackground()
 	bool unsig = HasBit(control, 4); //Which tile set to use 1 or 2 (whether the data is signed or unsigned)
 
 	ui8 palette = ReadData(BACKGROUND_PALLETTE);
-
-	//if (DEBUGGING)
-	//{
-	//	std::cout << std::dec << (int)(scrollY) << std::endl;
-	//}
-
 
 	ui16 tileData = 0;
 	ui16 tileMap = 0;
@@ -3269,7 +3366,7 @@ void GB::RenderSprites()
 		bool yFlip = HasBit(attributes, 6);
 		bool spriteOnTop = !HasBit(attributes, 7);
 
-		if ((line >= yPos) && (line < (yPos + spriteHeight))) // TODO: not breaking into this statement to draw the sprites
+		if ((line >= yPos) && (line < (yPos + spriteHeight))) // 
 		{
 			int spriteLine = line - yPos;
 

@@ -265,12 +265,14 @@ public:
 
     //**** HALT
     int haltDissableCycles;
+    bool haltBug = false;
     bool halt = false;
 
     GB();
 
     bool InitEMU(const char* path);
     void addBIOS();
+    void SkipBIOS();
     void Reset();
 
     void WriteData(ui16 address, ui8 data); 
@@ -289,6 +291,7 @@ public:
 
     ui8 ReadNextCode(); 
     void IncrementPC(); 
+    void DecrementPC();
     inline void SetPC(const ui16& value); 
 
     //**** BITS
@@ -359,13 +362,13 @@ public:
     OPCodePtr BASECodes[256];
     OPCodePtr CBCodes[256];
 
-    ui16 cycle;
-    ui16 cycles;
-    int timerCounter;
-    int clockFreq;
-    unsigned int divCounter;
+    ui16 cycle = 0;
+    ui16 cycles = 0;
+    int timerCounter = 0;
+    int clockFreq = 0;
+    unsigned int deviderCounter = 0;
 
-    void NextFrame();
+    void Frame();
     bool TickCPU();
     void TickClock();
     void ClockFrequency();
