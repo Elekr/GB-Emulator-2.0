@@ -1075,7 +1075,7 @@ void GB::CheckInterrupts()
 		if (interruptsEnabled)
 		{
 			// Loop through for all possible interrupts 
-			for (int i = 0; i < 5; i++)
+			for (int i = 0; i < 8; i++)
 			{
 				if (HasBit(interupt_flags, i))
 				{
@@ -1104,7 +1104,7 @@ void GB::CheckInterrupts()
 						break;
 					}
 
-					cycle += 20;
+					cycles += 20;
 
 					return;
 				}

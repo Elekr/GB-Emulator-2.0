@@ -39,7 +39,10 @@ int main(int argc, char* argv[])
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/cpu_individual/10-bit ops.gb"); // PASSED
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/cpu_individual/11-op a,(hl).gb"); // PASSED
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/cpu_individual/cpu_instrs.gb"); // WTF
-	gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/instr_timing.gb");
+	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/instr_timing.gb");
+	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/interrupt_time.gb");
+	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Pokemon Red.gb");
+
 
 	//**** TESTS MOONEYE
 	//gameboy->InitEMU("C:/users/Tom/Documents/GB-Emulator-2.0/Games/acceptance/interrupts/ie_push.gb"); //PASSED
@@ -52,6 +55,7 @@ int main(int argc, char* argv[])
 
 	std::chrono::time_point<std::chrono::high_resolution_clock> current, previous;
 	previous = std::chrono::high_resolution_clock::now(); //Time program started
+
 	while (windowOpen)
 	{
 		current = std::chrono::high_resolution_clock::now(); //Current time
