@@ -12,7 +12,7 @@ typedef signed __int16 i16;
 
 
 
-const int windowMultiplier = 4;
+const int windowMultiplier = 6;
 
 const ui8 A_REGISTER = 1;
 const ui8 F_REGISTER = 0;
@@ -196,6 +196,7 @@ class GB
 public:
 
     Cartridge* m_cartridge;
+    bool loaded;
 
     union //creates a union between the 8bit and 16bit registers - (automatically creates 16bit registers eg BC)
     {

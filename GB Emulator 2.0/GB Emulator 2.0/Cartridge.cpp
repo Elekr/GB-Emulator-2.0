@@ -96,38 +96,38 @@ void Cartridge::LoadMemoryRule()
 	}
 	break;
 
-	/*case GBCartridgeType::ROM_AND_MBC1_AND_RAM:
+	case CartType::ROM_AND_MBC1_AND_RAM:
 	{
-		m_memory_rule = std::make_unique<MBCN<CartMBC::MBC1, CartRam::Avaliable, CartBatt::None>>(this, m_bus);
+		m_memory_rule = new MBC1(this, m_bus);
 	}
 	break;
 
 
-	case GBCartridgeType::ROM_AND_MBC1_AND_RAM_AND_BATT:
+	case CartType::ROM_AND_MBC1_AND_RAM_AND_BATT:
 	{
-		m_memory_rule = std::make_unique<MBCN<CartMBC::MBC1, CartRam::Avaliable, CartBatt::Avaliable>>(this, m_bus);
+
 	}
 	break;
 
-	case GBCartridgeType::ROM_ANDMMMD1_AND_SRAM_AND_BATT:
+	case CartType::ROM_ANDMMMD1_AND_SRAM_AND_BATT:
 	{
-		m_memory_rule = std::make_unique<MBCN<CartMBC::MBC3, CartRam::Avaliable, CartBatt::Avaliable>>(this, m_bus);
+		
 	}
 	break;
 
 
 
-	case GBCartridgeType::ROM_AND_MBC3_AND_RAM_BATT:
+	case CartType::ROM_AND_MBC3_AND_RAM_BATT:
 	{
-		m_memory_rule = std::make_unique<MBCN<CartMBC::MBC3, CartRam::Avaliable, CartBatt::Avaliable>>(this, m_bus);
+		m_memory_rule = new MBC1(this, m_bus);
 	}
 	break;
 
-	case GBCartridgeType::ROM_AND_MBC5_AND_RAM_AND_BATT:
+	case CartType::ROM_AND_MBC5_AND_RAM_AND_BATT:
 	{
-		m_memory_rule = std::make_unique<MBCN<CartMBC::MBC5, CartRam::Avaliable, CartBatt::Avaliable>>(this, m_bus);
+	
 	}
-	break;*/
+	break;
 
 	default:
 		exit(0);

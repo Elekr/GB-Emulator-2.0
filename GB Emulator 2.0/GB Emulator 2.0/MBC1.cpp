@@ -1,5 +1,5 @@
 #include "MBC1.h"
-
+#include <iostream>
 MBC1::MBC1(Cartridge* cart, ui8* bus) : MBC(cart, bus)
 {
 	m_memory_bank = 1;
@@ -72,14 +72,14 @@ void MBC1::Write(ui16 address, ui8 data)
 
 			if (m_cart->GetRamSize() == 1 && address >= 0xA800)
 			{
-				assert(0 && "Attempting to wright out of ram's 2k memory range!");
+				assert(0 && "Attempting to write out of ram range");
 			}
 
 			m_bus[address] = m_cart->GetRawRamMemory()[(address - 0xA000) + m_ram_offset] = data;
 		}
 		else
 		{
-			//assert(0 && "Ram not enabled");
+			std::cout << "hi" << std::endl;
 		}
 
 		break;

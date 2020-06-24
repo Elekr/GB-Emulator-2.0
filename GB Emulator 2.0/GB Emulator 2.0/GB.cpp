@@ -16,7 +16,7 @@ GB::GB()
 bool GB::InitEMU(const char* path)
 {
 
-	bool loaded = m_cartridge->Load(path);
+	loaded = m_cartridge->Load(path);
 	if (!loaded)return false;
 	memcpy(m_bus, m_cartridge->GetRawData(), 0x8000);
 	addBIOS();
@@ -34,55 +34,59 @@ void GB::addBIOS()
 
 void GB::SkipBIOS()
 {
-	for (int i = 0x0000; i < 0xFFFF; i++)
+	if (loaded)
 	{
-		m_bus[i] = 0x0;
+		for (int i = 0x0000; i < 0xFFFF; i++)
+		{
+			m_bus[i] = 0x0;
+		}
+
+		memcpy(m_bus, m_cartridge->GetRawData(), 0x8000);
+
+		interruptsEnabled = false;
+
+		m_bus[0xFF05] = 0x00;
+		m_bus[0xFF06] = 0x00;
+		m_bus[0xFF07] = 0x00;
+		m_bus[0xFF0F] = 0xE1;
+		m_bus[0xFF10] = 0x80;
+		m_bus[0xFF11] = 0xBF;
+		m_bus[0xFF12] = 0xF3;
+		m_bus[0xFF14] = 0xBF;
+		m_bus[0xFF16] = 0x3F;
+		m_bus[0xFF17] = 0x00;
+		m_bus[0xFF19] = 0xBF;
+		m_bus[0xFF1A] = 0x7F;
+		m_bus[0xFF1B] = 0xFF;
+		m_bus[0xFF1C] = 0x9F;
+		m_bus[0xFF1E] = 0xBF;
+		m_bus[0xFF20] = 0xFF;
+		m_bus[0xFF21] = 0x00;
+		m_bus[0xFF22] = 0x00;
+		m_bus[0xFF23] = 0xBF;
+		m_bus[0xFF24] = 0x77;
+		m_bus[0xFF25] = 0xF3;
+		m_bus[0xFF26] = 0xF1;
+		m_bus[0xFF40] = 0x91;
+		m_bus[0xFF42] = 0x00;
+		m_bus[0xFF43] = 0x00;
+		m_bus[0xFF45] = 0x00;
+		m_bus[0xFF47] = 0xFC;
+		m_bus[0xFF48] = 0xFF;
+		m_bus[0xFF49] = 0xFF;
+		m_bus[0xFF4A] = 0x00;
+		m_bus[0xFF4B] = 0x00;
+		m_bus[0xFFFF] = 0x00;
+
+		SetWordRegister(SP_REGISTER, 0xFFFE);
+		SetWordRegister(AF_REGISTER, 0x01B0); // Gameboy
+		SetWordRegister(BC_REGISTER, 0x0013);
+		SetWordRegister(DE_REGISTER, 0x00D8);
+		SetWordRegister(HL_REGISTER, 0x014D);
+
+		SetPC(0x100);
 	}
-
-	memcpy(m_bus, m_cartridge->GetRawData(), 0x8000);
-
-	interruptsEnabled = false;
-
-	m_bus[0xFF05] = 0x00;
-	m_bus[0xFF06] = 0x00;
-	m_bus[0xFF07] = 0x00;
-	m_bus[0xFF0F] = 0xE1;
-	m_bus[0xFF10] = 0x80;
-	m_bus[0xFF11] = 0xBF;
-	m_bus[0xFF12] = 0xF3;
-	m_bus[0xFF14] = 0xBF;
-	m_bus[0xFF16] = 0x3F;
-	m_bus[0xFF17] = 0x00;
-	m_bus[0xFF19] = 0xBF;
-	m_bus[0xFF1A] = 0x7F;
-	m_bus[0xFF1B] = 0xFF;
-	m_bus[0xFF1C] = 0x9F;
-	m_bus[0xFF1E] = 0xBF;
-	m_bus[0xFF20] = 0xFF;
-	m_bus[0xFF21] = 0x00;
-	m_bus[0xFF22] = 0x00;
-	m_bus[0xFF23] = 0xBF;
-	m_bus[0xFF24] = 0x77;
-	m_bus[0xFF25] = 0xF3;
-	m_bus[0xFF26] = 0xF1;
-	m_bus[0xFF40] = 0x91;
-	m_bus[0xFF42] = 0x00;
-	m_bus[0xFF43] = 0x00;
-	m_bus[0xFF45] = 0x00;
-	m_bus[0xFF47] = 0xFC;
-	m_bus[0xFF48] = 0xFF;
-	m_bus[0xFF49] = 0xFF;
-	m_bus[0xFF4A] = 0x00;
-	m_bus[0xFF4B] = 0x00;
-	m_bus[0xFFFF] = 0x00;
-
-	SetWordRegister(SP_REGISTER, 0xFFFE);
-	SetWordRegister(AF_REGISTER, 0x01B0); // Gameboy
-	SetWordRegister(BC_REGISTER, 0x0013);
-	SetWordRegister(DE_REGISTER, 0x00D8);
-	SetWordRegister(HL_REGISTER, 0x014D);
-
-	SetPC(0x100);
+	
 
 }
 
@@ -3370,7 +3374,7 @@ void GB::RenderSprites()
 		bool yFlip = HasBit(attributes, 6);
 		bool spriteOnTop = !HasBit(attributes, 7);
 
-		if ((line >= yPos) && (line < (yPos + spriteHeight))) // 
+		if ((line >= yPos) && (line < (yPos + spriteHeight))) 
 		{
 			int spriteLine = line - yPos;
 
@@ -3411,12 +3415,15 @@ void GB::RenderSprites()
 					if (colourNum != WHITE) // Don't need to draw clear tiles
 					{
 						int pixelIndex = pixel + (DISPLAY_WIDTH * line);
-						//TODO: check if the sprite is on top
-						pixelRGB colour = currentPallete[(pallette, colours(colourNum))];
-						//Store them in the framebuffer
-						frameBuffer[pixelIndex * 4] = colour.blue;
-						frameBuffer[pixelIndex * 4 + 1] = colour.green;
-						frameBuffer[pixelIndex * 4 + 2] = colour.red;
+						if (spriteOnTop)
+						{
+							pixelRGB colour = currentPallete[(pallette, colours(colourNum))];
+
+							//Store them in the framebuffer
+							frameBuffer[pixelIndex * 4] = colour.blue;
+							frameBuffer[pixelIndex * 4 + 1] = colour.green;
+							frameBuffer[pixelIndex * 4 + 2] = colour.red;
+						}
 					}
 				}
 			}
