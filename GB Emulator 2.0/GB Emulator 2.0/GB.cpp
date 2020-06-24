@@ -5,6 +5,7 @@
 
 GB::GB()
 {
+	m_cartridge = new Cartridge(m_bus);
 	InitOPArray();
 	InitCBOPArray();
 
@@ -14,9 +15,10 @@ GB::GB()
 
 bool GB::InitEMU(const char* path)
 {
-	bool loaded = m_cartridge.Load(path);
+
+	bool loaded = m_cartridge->Load(path);
 	if (!loaded)return false;
-	memcpy(m_bus, m_cartridge.GetRawData(), 0x8000);
+	memcpy(m_bus, m_cartridge->GetRawData(), 0x8000);
 	addBIOS();
 	return true;
 }
@@ -37,7 +39,7 @@ void GB::SkipBIOS()
 		m_bus[i] = 0x0;
 	}
 
-	memcpy(m_bus, m_cartridge.GetRawData(), 0x8000);
+	memcpy(m_bus, m_cartridge->GetRawData(), 0x8000);
 
 	interruptsEnabled = false;
 
@@ -238,7 +240,7 @@ void GB::WriteData(ui16 address, ui8 data)
 					//	m_bus[i] = cartridgeMemory[i];
 					//}
 
-					memcpy(m_bus, m_cartridge.GetRawData(), BIOS_SIZE);
+					memcpy(m_bus, m_cartridge->GetRawData(), BIOS_SIZE);
 
 					//DEBUGGING Display the first 256 bytes to see if bios has been overwritten
 					//for (int i = 0; i < BIOS_SIZE; i++)
@@ -262,6 +264,7 @@ void GB::WriteData(ui16 address, ui8 data)
 	if (InMemoryRange(0xA000, 0xBFFF, address)) // Med Frequancy
 	{
 		// To do: Cart Ram
+		m_cartridge->GetMBCRule()->Write(address, data);
 		return;
 	}
 
@@ -273,9 +276,10 @@ void GB::WriteData(ui16 address, ui8 data)
 	}
 
 	// Cartridge ROM
-	if (InMemoryRange(0x0000, 0x7FFF, address)) // Low Frequancy
+	if (InMemoryRange(0x0000, 0x7FFF, address)) // Writing to the ROM is parsed through the MBC to change ROM/RAM
 	{
 		// To do: MBC Rule change
+		m_cartridge->GetMBCRule()->Write(address, data);
 		return;
 	}
 
@@ -3494,6 +3498,14 @@ void GB::switchPallete()
 		currentPallete = greyPallette;
 	}
 	else if (currentPallete == greyPallette)
+	{
+		currentPallete = tintPallette;
+	}
+	else if (currentPallete == tintPallette)
+	{
+		currentPallete = bluePallette;
+	}
+	else if (currentPallete == bluePallette)
 	{
 		currentPallete = classicPallette;
 	}

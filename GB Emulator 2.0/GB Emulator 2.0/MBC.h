@@ -10,7 +10,7 @@ class MBC
 {
 public:
 
-	virtual void write(ui16 address, ui8 data) = 0;
+	virtual void Write(ui16 address, ui8 data) = 0;
 
 	MBC(Cartridge* cart, ui8* bus) : m_cart(cart), m_bus(bus)
 	{

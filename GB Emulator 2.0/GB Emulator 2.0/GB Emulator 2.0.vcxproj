@@ -151,12 +151,14 @@
     <ClCompile Include="GB.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MBC.cpp" />
+    <ClCompile Include="MBC1.cpp" />
     <ClCompile Include="RomOnly.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Cartridge.h" />
     <ClInclude Include="GB.h" />
     <ClInclude Include="MBC.h" />
+    <ClInclude Include="MBC1.h" />
     <ClInclude Include="RomOnly.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -19,6 +19,6 @@ public:
 	ui8* GetRomBank0();
 	ui8* GetRomBank1();
 
-	virtual void write(ui16 address, ui8 data);
+	virtual void Write(ui16 address, ui8 data);
 };
 

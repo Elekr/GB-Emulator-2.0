@@ -26,7 +26,7 @@ ui8* RomOnly::GetRomBank1()
 	return &m_cart->GetRawRomMemory()[0x4000 * m_memory_bank]; //Get the current Bank TODO: change for ROM only?
 }
 
-void RomOnly::write(ui16 address, ui8 data)
+void RomOnly::Write(ui16 address, ui8 data)
 {
 	switch (address & 0xE000)
 	{

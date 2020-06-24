@@ -1,7 +1,13 @@
 #include "Cartridge.h"
 #include "RomOnly.h"
+#include "MBC1.h"
 #include <string>
 #include <iostream>
+
+Cartridge::Cartridge(ui8* bus) : m_bus(bus)
+{
+
+}
 
 bool Cartridge::Load(const char* path)
 {
@@ -28,7 +34,7 @@ bool Cartridge::Load(const char* path)
 	//}
 
 	//Get the title of the Game
-	char* name = new char[11];
+	char* name = new char[20];
 
 	for (int i = 0; i < 10; i++)
 	{
@@ -59,9 +65,17 @@ bool Cartridge::Load(const char* path)
 		rawRamSize = 0x1024 * 128;
 		break;
 	}
-	if (rawRamSize > 0) //If there's ram 
+
+	LoadMemoryRule();
+
+	//if (m_memory_rule->HasRam() && ramSize == 0)
+	//{
+	//	m_raw_ram_size = 0x1024 * 128;
+	//}
+
+	if (rawRamSize > 0)
 	{
-		ram = new ui8[rawRamSize];
+		ram = new ui8[rawRamSize]{ 0 };
 	}
 
 	return true;
@@ -76,13 +90,13 @@ void Cartridge::LoadMemoryRule()
 		m_memory_rule = new RomOnly(this, m_bus);
 	}
 	break;
-	/*case GBCartridgeType::ROM_AND_MBC1:
+	case CartType::ROM_AND_MBC1:
 	{
-		m_memory_rule = std::make_unique<MBCN<CartMBC::MBC1, CartRam::None, CartBatt::None>>(this, m_bus);
+		m_memory_rule = new MBC1(this, m_bus);
 	}
 	break;
 
-	case GBCartridgeType::ROM_AND_MBC1_AND_RAM:
+	/*case GBCartridgeType::ROM_AND_MBC1_AND_RAM:
 	{
 		m_memory_rule = std::make_unique<MBCN<CartMBC::MBC1, CartRam::Avaliable, CartBatt::None>>(this, m_bus);
 	}

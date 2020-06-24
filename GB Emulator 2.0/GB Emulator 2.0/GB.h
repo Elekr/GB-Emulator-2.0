@@ -195,7 +195,7 @@ class GB
 {
 public:
 
-    Cartridge m_cartridge;
+    Cartridge* m_cartridge;
 
     union //creates a union between the 8bit and 16bit registers - (automatically creates 16bit registers eg BC)
     {
@@ -405,9 +405,11 @@ public:
     SDL_Window* window;
     SDL_Renderer* render;
     SDL_Texture* screen_texture;
-    pixelRGB* currentPallete = classicPallette;
+    pixelRGB* currentPallete = tintPallette;
     pixelRGB classicPallette[4] = { { 155,188,15 }, { 139,172,15 }, { 48,98,48 }, { 15,56,15 } };
     pixelRGB greyPallette[4] = { { 255,255,255 },{ 0xCC,0xCC,0xCC },{ 0x77,0x77,0x77 }, { 0x0,0x0,0x0 } };
+    pixelRGB tintPallette[4] = { { 224,248,208 },{ 136,192,112 },{ 52,104,86 }, { 8,24,32 } };
+    pixelRGB bluePallette[4] = { { 192,192,255 },{ 95,96,255 },{ 0,0,192 }, { 0,0,96 } };
 
     static const unsigned int m_display_buffer_size = (160 * 144) * 4;
 
