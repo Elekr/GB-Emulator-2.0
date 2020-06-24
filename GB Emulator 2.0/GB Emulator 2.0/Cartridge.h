@@ -3,7 +3,7 @@
 #include <string>
 #include <fstream>
 
-using namespace std;
+#include "MBC.h"
 
 typedef unsigned __int8 ui8; //8-bit Integer
 typedef signed __int8 i8;
@@ -54,24 +54,34 @@ const int RAM_SIZE = 0x0149;
 class Cartridge
 {
 public:
-    ui8* mp_cart_data = nullptr;
+    ui8* dynamicMemory = nullptr;
     ui8* ram = nullptr;
+    ui8* m_bus;
 
     const char* path;
-    string gameTitle;
+
+    std::string gameTitle;
+
     bool cb;
-    int romSize;
-    int ramSize;
+
     int destinationCode;
 
-    CartType cartType;
+    int romSize;
+    int ramSize;
     ui8 rawRamSize;
 
+    CartType cartType;
+
+    MBC* m_memory_rule;
+
     bool Load(const char* path);
-    ui8* GetRawData()
-    {
-        return mp_cart_data;
-    }
+    void LoadMemoryRule();
+    ui8* GetRawData();
+    int GetRamSize() { return ramSize; }
+    ui8* GetRawRomMemory() { return dynamicMemory; }
+    ui8* GetRawRamMemory() { return ram; }
+
+    ui8 RamBankCount();
 
 };
 

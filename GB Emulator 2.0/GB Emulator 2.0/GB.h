@@ -194,6 +194,7 @@ const ui16 RESET_38 = 0x0038;
 class GB
 {
 public:
+
     Cartridge m_cartridge;
 
     union //creates a union between the 8bit and 16bit registers - (automatically creates 16bit registers eg BC)

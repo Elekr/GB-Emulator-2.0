@@ -1,11 +1,12 @@
 #include "Cartridge.h"
+#include "RomOnly.h"
 #include <string>
 #include <iostream>
 
 bool Cartridge::Load(const char* path)
 {
 	//http://www.cplusplus.com/doc/tutorial/files/
-	ifstream file(path, ios::ate | std::ios::binary); //ate sets the initial position to the end of the file (to parse the file size)
+	std::ifstream file(path, std::ios::ate | std::ios::binary); //ate sets the initial position to the end of the file (to parse the file size)
 
 	if (!file.is_open())
 	{
@@ -15,9 +16,9 @@ bool Cartridge::Load(const char* path)
 	//https://stackoverflow.com/questions/2409504/using-c-filestreams-fstream-how-can-you-determine-the-size-of-a-file
 	unsigned int fileSize = static_cast<int>(file.tellg());
 
-	mp_cart_data = new ui8[fileSize]; //Allocate memory for the rom 
+	dynamicMemory = new ui8[fileSize]; //Allocate memory for the rom 
 	file.seekg(0, std::ios::beg);
-	file.read((char*)mp_cart_data, fileSize); //Cast to char
+	file.read((char*)dynamicMemory, fileSize); //Cast to char
 	file.close();
 
 	//Used for debugging issues with loading the cart in
@@ -31,17 +32,17 @@ bool Cartridge::Load(const char* path)
 
 	for (int i = 0; i < 10; i++)
 	{
-		name[i] = mp_cart_data[TITLE_LOC + i];	
+		name[i] = dynamicMemory[TITLE_LOC + i];	
 	}
 	gameTitle = name;
 
-	mp_cart_data[CGB] == 0x80;
+	dynamicMemory[CGB] == 0x80;
 
-	cartType = (CartType)mp_cart_data[CART_TYPE];
+	cartType = (CartType)dynamicMemory[CART_TYPE];
 
-	destinationCode = mp_cart_data[DEST_CODE];
+	destinationCode = dynamicMemory[DEST_CODE];
 
-	ramSize = mp_cart_data[RAM_SIZE];
+	ramSize = dynamicMemory[RAM_SIZE];
 
 	switch (ramSize)
 	{
@@ -64,4 +65,80 @@ bool Cartridge::Load(const char* path)
 	}
 
 	return true;
+}
+
+void Cartridge::LoadMemoryRule()
+{
+	switch (cartType)
+	{
+	case CartType::ROM_ONLY:
+	{
+		m_memory_rule = new RomOnly(this, m_bus);
+	}
+	break;
+	/*case GBCartridgeType::ROM_AND_MBC1:
+	{
+		m_memory_rule = std::make_unique<MBCN<CartMBC::MBC1, CartRam::None, CartBatt::None>>(this, m_bus);
+	}
+	break;
+
+	case GBCartridgeType::ROM_AND_MBC1_AND_RAM:
+	{
+		m_memory_rule = std::make_unique<MBCN<CartMBC::MBC1, CartRam::Avaliable, CartBatt::None>>(this, m_bus);
+	}
+	break;
+
+
+	case GBCartridgeType::ROM_AND_MBC1_AND_RAM_AND_BATT:
+	{
+		m_memory_rule = std::make_unique<MBCN<CartMBC::MBC1, CartRam::Avaliable, CartBatt::Avaliable>>(this, m_bus);
+	}
+	break;
+
+	case GBCartridgeType::ROM_ANDMMMD1_AND_SRAM_AND_BATT:
+	{
+		m_memory_rule = std::make_unique<MBCN<CartMBC::MBC3, CartRam::Avaliable, CartBatt::Avaliable>>(this, m_bus);
+	}
+	break;
+
+
+
+	case GBCartridgeType::ROM_AND_MBC3_AND_RAM_BATT:
+	{
+		m_memory_rule = std::make_unique<MBCN<CartMBC::MBC3, CartRam::Avaliable, CartBatt::Avaliable>>(this, m_bus);
+	}
+	break;
+
+	case GBCartridgeType::ROM_AND_MBC5_AND_RAM_AND_BATT:
+	{
+		m_memory_rule = std::make_unique<MBCN<CartMBC::MBC5, CartRam::Avaliable, CartBatt::Avaliable>>(this, m_bus);
+	}
+	break;*/
+
+	default:
+		exit(0);
+		break;
+	}
+}
+
+ui8* Cartridge::GetRawData()
+{
+	return dynamicMemory;
+}
+
+ui8 Cartridge::RamBankCount()
+{
+	switch (ramSize)
+	{
+	case 0:
+		return 0;
+	case 1:
+	case 2:
+		return 1;
+	case 3:
+		return 4;
+	case 4:
+		return 16;
+	}
+	return 0;
 }

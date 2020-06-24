@@ -24,12 +24,24 @@
     <ClCompile Include="Cartridge.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="MBC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RomOnly.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GB.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Cartridge.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MBC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RomOnly.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
