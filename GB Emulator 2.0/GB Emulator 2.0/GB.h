@@ -132,6 +132,10 @@ enum JoyPad
 
 //**************************************************** Display
 
+static SDL_Window* window;
+static SDL_Renderer* render;
+static SDL_Texture* screen_texture;
+
 const int DISPLAY_HEIGHT = 144;
 const int DISPLAY_WIDTH = 160;
 
@@ -271,6 +275,7 @@ public:
     bool halt = false;
 
     GB();
+    ~GB();
 
     bool InitEMU(const char* path);
     void addBIOS();
@@ -313,10 +318,12 @@ public:
     bool CheckFlag(int flag); ////////
     void ClearFlags(); ////////
 
-    //**** JUMPS
+    //https://rednex.github.io/rgbds/gbz80.7.html
+    //**** JUMPS 
     void Jr();
 
     void Jr(const ui16& address);
+
 
     void ADDHL(const ui16& reg);
 
@@ -383,6 +390,8 @@ public:
     void OUTPUTREGISTERS(ui8 op);
     void OUTPUTCBREGISTERS(ui8 op);
 
+    bool DEBUGGING = false;
+
     //*************************************************************** JoyPad
 
     ui8 joypadActual = 0xFF;
@@ -403,9 +412,7 @@ public:
 
     //*************************************************************** Display
     //**** SDL Window
-    SDL_Window* window;
-    SDL_Renderer* render;
-    SDL_Texture* screen_texture;
+
     pixelRGB* currentPallete = tintPallette;
     pixelRGB classicPallette[4] = { { 155,188,15 }, { 139,172,15 }, { 48,98,48 }, { 15,56,15 } };
     pixelRGB greyPallette[4] = { { 255,255,255 },{ 0xCC,0xCC,0xCC },{ 0x77,0x77,0x77 }, { 0x0,0x0,0x0 } };
@@ -455,7 +462,6 @@ public:
     void CheckInterrupts();
     void CompareLYWithLYC();
 
-    bool DEBUGGING = false;
 
 //OP CODES
     void OP00(); // NOP

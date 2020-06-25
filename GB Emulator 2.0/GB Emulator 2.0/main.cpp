@@ -21,11 +21,15 @@ int main(int argc, char* argv[])
 	//**** GAMES
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/DrMario.gb");
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Tetris.gb"); 
+
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Super Mario Land.gb");
-	gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Kirby's Dream Land.gb");
+	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Kirby's Dream Land.gb");
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Pokemon Red.gb");
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/pocket.gb");
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Metroid II.gb");
+
+	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/LOZ_LA.gb");
+	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Super Mario Land 2.gb"); cursed
 
 	//https://fladnag.net/downloads/telephone/palm/APPS/Liberty1.25/rom2pdb.c Fix for tetris (If interrupts are not implemented)
 	//https://www.reddit.com/r/EmuDev/comments/6sxb09/gb_tetris_stuck_at_copyright_screen/ // Tetris bugs intentional
@@ -96,6 +100,6 @@ int main(int argc, char* argv[])
 		startTime = endTime;
 	}
 
-	SDL_Quit();
+	delete gameboy;
 	return 0;
 }

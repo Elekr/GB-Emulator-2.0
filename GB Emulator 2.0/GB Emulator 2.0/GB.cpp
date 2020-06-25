@@ -13,6 +13,14 @@ GB::GB()
 	Reset();
 }
 
+GB::~GB()
+{
+	SDL_DestroyTexture(screen_texture);
+	SDL_DestroyRenderer(render);
+	SDL_DestroyWindow(window);
+	SDL_Quit();
+}
+
 bool GB::InitEMU(const char* path)
 {
 
@@ -3241,8 +3249,18 @@ void GB::handleLCDTransferMode()
 
 void GB::RenderGame()
 {
-	SDL_UpdateTexture(screen_texture, NULL, this->frameBuffer, DISPLAY_WIDTH * 4);
-	SDL_RenderClear(render);
+	/*SDL_UpdateTexture(screen_texture, NULL, this->frameBuffer, DISPLAY_WIDTH * 4);
+	SDL_RenderCopy(render, screen_texture, nullptr, nullptr);
+	SDL_RenderPresent(render);*/
+
+	void* pixels_ptr;
+	int pitch;
+	SDL_LockTexture(screen_texture, nullptr, &pixels_ptr, &pitch);
+
+	char* pixels = static_cast<char*>(pixels_ptr);
+
+	memcpy(pixels, frameBuffer, DISPLAY_WIDTH * DISPLAY_HEIGHT * 4);
+	SDL_UnlockTexture(screen_texture);
 	SDL_RenderCopy(render, screen_texture, nullptr, nullptr);
 	SDL_RenderPresent(render);
 }
@@ -3298,7 +3316,7 @@ void GB::RenderWindow(ui8 windowY)
 
 	ui8& line = ReadData(LYRegister);
 
-	ui8 windowX = ReadData(WINDOW_X);
+	ui8& windowX = ReadData(WINDOW_X);
 
 	if (windowX <= 0x07)
 	{
@@ -3348,7 +3366,7 @@ void GB::RenderWindow(ui8 windowY)
 void GB::RenderSprites()
 {
 	ui8& control = ReadData(lcdcRegister);
-	ui8& line = ReadData(LYRegister);
+	
 
 	ui8 spriteHeight = 8;
 
@@ -3361,15 +3379,16 @@ void GB::RenderSprites()
 	{
 		//Get the position and Tile index of the sprite
 		ui8 index = sprite * 4; //A sprite is 4 bytes ( starting position of the sprite)
-		ui8 yPos = ReadData(0xFE00 + index) - 16;
-		ui8 xPos = ReadData(0xFE00 + index + 1) - 8;
-		ui8 tileIndex = ReadData(0xFE00 + index + 2);
 
-		//Sprite Attributes
+		int yPos = ReadData(0xFE00 + index) - 16;
+		int xPos = ReadData(0xFE00 + index + 1) - 8;
+
+		int tileIndex = ReadData(0xFE00 + index + 2);
 		ui8 attributes = ReadData(0xFE00 + index + 3);
+
 		ui16 pallette = HasBit(attributes, 4) ? 0xFF49 : 0xFF48;
-		ui8 backgroundPallette = ReadData(0xFF47);
-		pixelRGB backgroundZeroColour = currentPallete[getColourFromPallette(backgroundPallette, WHITE)];
+		ui8& line = ReadData(LYRegister);
+		
 		bool xFlip = HasBit(attributes, 5);
 		bool yFlip = HasBit(attributes, 6);
 		bool spriteOnTop = !HasBit(attributes, 7);
@@ -3384,46 +3403,51 @@ void GB::RenderSprites()
 				spriteLine *= -1;
 			}
 
-			spriteLine *= 2;
+				spriteLine *= 2;
 
 			ui16 dataAddress = (0x8000 + (tileIndex * 16)) + spriteLine;
 			ui8 upper = ReadData(dataAddress);
 			ui8 lower = ReadData(dataAddress + 1);
 
 			//Setting the pixel colours of the sprite tile
-			for (int tilePixel = 7; tilePixel >= 0; tilePixel--)
+			for (int tilePixel = 0; tilePixel < 8; ++tilePixel)
 			{
-				int xPix = 0 - tilePixel;
-				xPix += 7;
 
-				int pixel = xPos + xPix;
+				int pixel = xPos + tilePixel;
+
+				if (pixel < 0 || (pixel >= 160)) // 160 Gameboy width
+					continue;
 
 				if (pixel < 160 && line < 144)
 				{
 					int position = tilePixel;
-					ui8 colourNum = 0x00;
+
 					if (xFlip)
 					{
 						position -= 7;
 						position *= -1;
 					}
 
-					colourNum = (lower >> position) & 1; // Get the set bit
-					colourNum <<= 1;
-					colourNum |= (upper >> position) & 1;
+					int colorX = xFlip ? tilePixel : 7 - tilePixel;
 
-					if (colourNum != WHITE) // Don't need to draw clear tiles
+					int colourNum = (ui8)(lower >> colorX) & 1; // Get the set bit
+					colourNum <<= 1;
+					colourNum |= (ui8)(upper >> colorX) & 1; // Get the set bit
+
+					if (colourNum != WHITE)
 					{
 						int pixelIndex = pixel + (DISPLAY_WIDTH * line);
-						if (spriteOnTop)
-						{
-							pixelRGB colour = currentPallete[(pallette, colours(colourNum))];
 
-							//Store them in the framebuffer
-							frameBuffer[pixelIndex * 4] = colour.blue;
-							frameBuffer[pixelIndex * 4 + 1] = colour.green;
-							frameBuffer[pixelIndex * 4 + 2] = colour.red;
-						}
+						ui8 color = (pallette >> (colourNum * 2)) & 0x03;
+
+						//pixelRGB colour = currentPallete[getColourFromPallette(pallette, colours(colourNum))];
+						//pixelRGB colour = currentPallete[pallette, color];
+						//pixelRGB colour = currentPallete[getColourFromPallette(pallette, colours(color))];
+						pixelRGB colour = currentPallete[pallette, colours(colourNum)];
+						//Store them in the framebuffer
+						frameBuffer[pixelIndex * 4] = colour.blue;
+						frameBuffer[pixelIndex * 4 + 1] = colour.green;
+						frameBuffer[pixelIndex * 4 + 2] = colour.red;
 					}
 				}
 			}

@@ -1,5 +1,2 @@
-﻿  GB.cpp
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(887,24): warning C4553: '==': result of expression not used; did you intend '='?
-  main.cpp
-  Generating Code...
+﻿  main.cpp
   GB Emulator 2.0.vcxproj -> C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\Debug\GB Emulator 2.0.exe

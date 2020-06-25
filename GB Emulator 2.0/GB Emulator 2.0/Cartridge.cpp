@@ -105,7 +105,7 @@ void Cartridge::LoadMemoryRule()
 
 	case CartType::ROM_AND_MBC1_AND_RAM_AND_BATT:
 	{
-
+		m_memory_rule = new MBC1(this, m_bus);
 	}
 	break;
 
