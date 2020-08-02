@@ -12,13 +12,13 @@ public:
 
 	virtual void Write(ui16 address, ui8 data) = 0;
 
-	MBC(Cartridge* cart, ui8* bus) : m_cart(cart), m_bus(bus)
+	MBC(Cartridge* cart, ui8* bus) : cart(cart), memoryBus(bus)
 	{
 
 	}
 
 protected:
-	Cartridge* m_cart;
-	ui8* m_bus;
+	Cartridge* cart;
+	ui8* memoryBus;
 };
 

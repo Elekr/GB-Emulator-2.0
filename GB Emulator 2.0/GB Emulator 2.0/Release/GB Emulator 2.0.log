@@ -1,21 +1,7 @@
-﻿  Cartridge.cpp
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\Cartridge.cpp(45,21): warning C4553: '==': result of expression not used; did you intend '='?
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\Cartridge.cpp(56,26): warning C4305: '=': truncation from 'int' to 'ui8'
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\Cartridge.cpp(56,23): warning C4309: '=': truncation of constant value
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\Cartridge.cpp(59,26): warning C4305: '=': truncation from 'int' to 'ui8'
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\Cartridge.cpp(59,23): warning C4309: '=': truncation of constant value
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\Cartridge.cpp(62,27): warning C4305: '=': truncation from 'int' to 'ui8'
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\Cartridge.cpp(62,23): warning C4309: '=': truncation of constant value
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\Cartridge.cpp(65,28): warning C4305: '=': truncation from 'int' to 'ui8'
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\Cartridge.cpp(65,23): warning C4309: '=': truncation of constant value
-  GB.cpp
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(883,24): warning C4553: '==': result of expression not used; did you intend '='?
-  MBC1.cpp
-  RomOnly.cpp
-  main.cpp
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\main.cpp(100,13): warning C4018: '<': signed/unsigned mismatch
+﻿  main.cpp
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\main.cpp(106,13): warning C4018: '<': signed/unsigned mismatch
   Generating code
-  8 of 793 functions ( 1.0%) were compiled, the rest were copied from previous compilation.
+  1 of 793 functions ( 0.1%) were compiled, the rest were copied from previous compilation.
     0 functions were new in current compilation
     1 functions had inline decision re-evaluated but remain unchanged
   Finished generating code

@@ -1,11 +1,10 @@
 
 #include "Cartridge.h"
 #include "GB.h"
-#include <chrono> //https://en.cppreference.com/w/cpp/chrono
 #include <thread>
 //https://github.com/ocornut/imgui
 
-short fps = 50;
+short fps = 40; //Feels more natural?
 short timePerFrame = 1000 / fps;
 
 int main(int argc, char* argv[])
@@ -13,28 +12,38 @@ int main(int argc, char* argv[])
 	GB* gameboy = new GB();
 	bool windowOpen = gameboy->createSDLWindow();
 
-	//TODO:
-	//JOYPAD INPUT (Test works properly (interrupts)
-	//WINDOW RESIZING
-	//MBC BATTERY
+	if (argc == 2) //Used to access to the emulator through console
+	{
+		std::cout << "Game loaded: " << argv[1] << std::endl;
+		gameboy->InitEMU(argv[1]);
+	}
+	else
+	{
+		gameboy->InitEMU("cpu_instrs.gb"); //Defaults to Blargg's as public use ROM
+	}
 
-	//**** GAMES
+	//********* GAMES (Usedf for testing purposes)
+
+	//**** ROM Only
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/DrMario.gb");
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Tetris.gb"); 
-
-	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Super Mario Land.gb");
-	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Kirby's Dream Land.gb");
-	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Pokemon Red.gb");
-	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/pocket.gb");
-	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Metroid II.gb");
-
-	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/LOZ_LA.gb");
-	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Super Mario Land 2.gb"); cursed
 
 	//https://fladnag.net/downloads/telephone/palm/APPS/Liberty1.25/rom2pdb.c Fix for tetris (If interrupts are not implemented)
 	//https://www.reddit.com/r/EmuDev/comments/6sxb09/gb_tetris_stuck_at_copyright_screen/ // Tetris bugs intentional
 
-	//**** TESTS BLARGGS
+	//**** MBC1
+	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Super Mario Land.gb");
+	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Game Boy Gallery.gb");
+	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Kirby's Dream Land.gb");
+	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Pokemon Red.gb");
+	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/pocket.gb");
+	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Metroid II.gb");
+	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/LOZ_LA.gb");
+	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Super Mario Land 2.gb"); // (cursed)
+
+
+
+	//**** TESTS BLARGGS All Passed
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/cpu_individual/01-special.gb");
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/cpu_individual/02-interrupts.gb");
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/cpu_individual/03-op sp,hl.gb");
@@ -51,15 +60,17 @@ int main(int argc, char* argv[])
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/interrupt_time.gb");
 
 
-	//**** TESTS MOONEYE
+	//**** TESTS MOONEYE Some Pass but further development required
 	//gameboy->InitEMU("C:/users/Tom/Documents/GB-Emulator-2.0/Games/acceptance/interrupts/ie_push.gb"); //PASSED
 	//gameboy->InitEMU("C:/users/Tom/Documents/GB-Emulator-2.0/Games/acceptance/instr/daa.gb"); //PASSED
 	//gameboy->InitEMU("C:/users/Tom/Documents/GB-Emulator-2.0/Games/acceptance/timer/tim00_div_trigger.gb"); // PASSED
 	//gameboy->InitEMU("C:/users/Tom/Documents/GB-Emulator-2.0/Games/acceptance/ppu/lcdon_timing-GS.gb"); // FAILS
 	//gameboy->InitEMU("C:/users/Tom/Documents/GB-Emulator-2.0/Games/acceptance/oam_dma/reg_read.gb"); //PASSED
 
-	//gameboy->SkipBIOS();
+	//**** Official Gameboy Test ROM Passed
+	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/dmg_test_prog_ver1.gb"); 
 
+	//Used to calculate frame time
 	Uint32 startTime = SDL_GetTicks();
 	Uint32 endTime = 0;
 	Uint32 delta = 0;
@@ -92,14 +103,13 @@ int main(int argc, char* argv[])
 		endTime = SDL_GetTicks();
 		delta = endTime - startTime;
 
-		//if (delta < timePerFrame)
-		//{
-		//	SDL_Delay(timePerFrame - delta);
-		//}
+		if (delta < timePerFrame)
+		{
+			SDL_Delay(timePerFrame - delta);
+		}
 
 		startTime = endTime;
 	}
-
 	delete gameboy;
-	return 0;
+	return 0; //Needed by SDL2
 }

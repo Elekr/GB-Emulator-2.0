@@ -5,12 +5,11 @@
 
 GB::GB()
 {
-	m_cartridge = new Cartridge(m_bus);
-	InitOPArray();
+	cartridge = new Cartridge(memoryBus); //Passed over so that the MBC can write to the bus
+	InitOPArray(); 
 	InitCBOPArray();
 
-	//Reset function
-	Reset();
+	Reset(); //Fresh reset incase the registers are set up incorrectly
 }
 
 GB::~GB()
@@ -24,19 +23,22 @@ GB::~GB()
 bool GB::InitEMU(const char* path)
 {
 
-	loaded = m_cartridge->Load(path);
+	loaded = cartridge->LoadCartridge(path); //Loads the ROM into the Cartridge Class
 	if (!loaded)return false;
-	memcpy(m_bus, m_cartridge->GetRawData(), 0x8000);
-	addBIOS();
+	memcpy(memoryBus, cartridge->GetROMData(), 0x8000); //Put the first two banks into the bus
+	//addBIOS(); // Displays the Nintendo boot sequence, disabled by default.
+	if (SKIPBIOS)
+	{
+		SkipBIOS();
+	}
 	return true;
 }
 
 void GB::addBIOS()
 {
-	//PUT THE BIOS INTO THE M_BUS
 	for (int i = 0; i < 256; i++)
 	{
-		m_bus[i] = BIOS[i];
+		memoryBus[i] = BIOS[i];
 	}
 }
 
@@ -44,141 +46,134 @@ void GB::SkipBIOS()
 {
 	if (loaded)
 	{
-		for (int i = 0x0000; i < 0xFFFF; i++)
-		{
-			m_bus[i] = 0x0;
-		}
 
-		memcpy(m_bus, m_cartridge->GetRawData(), 0x8000);
+		memcpy(memoryBus, cartridge->GetROMData(), 0x100); //Replaces the first 256 bytes with Bank 1
 
 		interruptsEnabled = false;
+		//https://github.com/AntonioND/giibiiadvance/blob/master/docs/TCAGBD.pdf Initial register information
 
-		m_bus[0xFF05] = 0x00;
-		m_bus[0xFF06] = 0x00;
-		m_bus[0xFF07] = 0x00;
-		m_bus[0xFF0F] = 0xE1;
-		m_bus[0xFF10] = 0x80;
-		m_bus[0xFF11] = 0xBF;
-		m_bus[0xFF12] = 0xF3;
-		m_bus[0xFF14] = 0xBF;
-		m_bus[0xFF16] = 0x3F;
-		m_bus[0xFF17] = 0x00;
-		m_bus[0xFF19] = 0xBF;
-		m_bus[0xFF1A] = 0x7F;
-		m_bus[0xFF1B] = 0xFF;
-		m_bus[0xFF1C] = 0x9F;
-		m_bus[0xFF1E] = 0xBF;
-		m_bus[0xFF20] = 0xFF;
-		m_bus[0xFF21] = 0x00;
-		m_bus[0xFF22] = 0x00;
-		m_bus[0xFF23] = 0xBF;
-		m_bus[0xFF24] = 0x77;
-		m_bus[0xFF25] = 0xF3;
-		m_bus[0xFF26] = 0xF1;
-		m_bus[0xFF40] = 0x91;
-		m_bus[0xFF42] = 0x00;
-		m_bus[0xFF43] = 0x00;
-		m_bus[0xFF45] = 0x00;
-		m_bus[0xFF47] = 0xFC;
-		m_bus[0xFF48] = 0xFF;
-		m_bus[0xFF49] = 0xFF;
-		m_bus[0xFF4A] = 0x00;
-		m_bus[0xFF4B] = 0x00;
-		m_bus[0xFFFF] = 0x00;
+		WriteData((ui16)0xFF05, (ui8)0x00);
+		WriteData((ui16)0xFF06, (ui8)0x00);
+		WriteData((ui16)0xFF07, (ui8)0x00);
+		WriteData((ui16)0xFF10, (ui8)0x80);
+		WriteData((ui16)0xFF11, (ui8)0xBF);
+		WriteData((ui16)0xFF12, (ui8)0xF3);
+		WriteData((ui16)0xFF14, (ui8)0xBF);
+		WriteData((ui16)0xFF16, (ui8)0x3F);
+		WriteData((ui16)0xFF17, (ui8)0x00);
+		WriteData((ui16)0xFF19, (ui8)0xBF);
+		WriteData((ui16)0xFF1A, (ui8)0x7F);
+		WriteData((ui16)0xFF1B, (ui8)0xFF);
+		WriteData((ui16)0xFF1C, (ui8)0x9F);
+		WriteData((ui16)0xFF1E, (ui8)0xBF);
+		WriteData((ui16)0xFF20, (ui8)0xFF);
+		WriteData((ui16)0xFF21, (ui8)0x00);
+		WriteData((ui16)0xFF22, (ui8)0x00);
+		WriteData((ui16)0xFF23, (ui8)0xBF);
+		WriteData((ui16)0xFF24, (ui8)0x77);
+		WriteData((ui16)0xFF25, (ui8)0xF3);
+		WriteData((ui16)0xFF26, (ui8)0xF1);
+		WriteData((ui16)0xFF40, (ui8)0x91);
+		WriteData((ui16)0xFF42, (ui8)0x00);
+		WriteData((ui16)0xFF43, (ui8)0x00);
+		WriteData((ui16)0xFF45, (ui8)0x00);
+		WriteData((ui16)0xFF47, (ui8)0xFC);
+		WriteData((ui16)0xFF48, (ui8)0xFF);
+		WriteData((ui16)0xFF49, (ui8)0xFF);
+		WriteData((ui16)0xFF4A, (ui8)0x00);
+		WriteData((ui16)0xFF4B, (ui8)0x00);
+		WriteData((ui16)0xFFFF, (ui8)0x00);
 
 		SetWordRegister(SP_REGISTER, 0xFFFE);
-		SetWordRegister(AF_REGISTER, 0x01B0); // Gameboy
+		SetWordRegister(AF_REGISTER, 0x01B0); 
 		SetWordRegister(BC_REGISTER, 0x0013);
 		SetWordRegister(DE_REGISTER, 0x00D8);
 		SetWordRegister(HL_REGISTER, 0x014D);
 
 		SetPC(0x100);
 	}
-	
-
 }
 
 void GB::Reset()
 {
-	SetWordRegister(SP_REGISTER, 0x0000);
-	SetPC(0x0000);
 
-	SetWordRegister(AF_REGISTER, 0x0000);
-	SetWordRegister(BC_REGISTER, 0x0000);
-	SetWordRegister(DE_REGISTER, 0x0000);
-	SetWordRegister(HL_REGISTER, 0x0000);
+	SetPC(0x0);
+	SetWordRegister(SP_REGISTER, 0x0);
+	SetWordRegister(AF_REGISTER, 0x0);
+	SetWordRegister(BC_REGISTER, 0x0);
+	SetWordRegister(DE_REGISTER, 0x0);
+	SetWordRegister(HL_REGISTER, 0x0);
 
 
-
-	for (unsigned int i = 0; i < m_display_buffer_size; i++)
+	for (unsigned int i = 0; i < (DISPLAY_HEIGHT * DISPLAY_WIDTH) * 4; i++)
 	{
-		frameBuffer[i] = 0x0;
+		frameBuffer[i] = 0x0; //Resets the display
 	}
 
 	for (int i = 0; i < BIOS_SIZE; i++)
 	{
-		m_bus[i] = BIOS[i];
+		memoryBus[i] = BIOS[i];
 	}
 
-	for (int i = 0x9800; i < 0x9800 + 0x400; i++)
+	for (int i = 0x8000; i < 0x8000; i++)
 	{
-		m_bus[i] = 0x0;
+		memoryBus[i] = 0x0;
 	}
 
-	ReadData(LYRegister) = 144;
+	ReadData(LY_REGISTER) = 144; //Sets the current display line (will reset to 0)
 
-	interruptsEnabled = false;
-	ReadData(m_cpu_interupt_flag_address) = 0x0;
+	interruptsEnabled = false; //Disabled by default
+	ReadData(CPU_INTERUPT_REGISTER) = 0x0;
 
 	// Reset the joypad
-	joypadActual = 0xFF;
-	m_joypadCycles = 0;
+	joypadRegister = 0xFF;
+	joypadCycles = 0;
 
 	// Reset display
-	ReadData(LYRegister) = 144; // Set scanline to 144
+	ReadData(LY_REGISTER) = 144; // Set scanline to 144
 	videoCycles = 0;
 	currentMode = V_BLANK;
 
-	ClockFrequency();
+	ClockFrequency(); //Sets frequency to default
 }
 
 void GB::WriteData(ui16 address, ui8 data)
 {
-	if (InMemoryRange(0x8000, 0x9FFF, address)) // High Frequancy
+	if (InMemoryRange(0x8000, 0x9FFF, address))
 	{
-		m_bus[address] = data;
+		memoryBus[address] = data;
 		return;
 	}
 
 	// Main Ram
-	if (InMemoryRange(0xC000, 0xDFFF, address)) // High Frequancy
+	if (InMemoryRange(0xC000, 0xDFFF, address)) 
 	{
-		m_bus[address] = data;
+		memoryBus[address] = data;
 		return;
 	}
 
 	// Echo Ram
-	if (InMemoryRange(0xE000, 0xFDFF, address)) // High Frequancy
+	if (InMemoryRange(0xE000, 0xFDFF, address))
 	{
-		// Since we are not supposed to read or write to this space, we shall access the main ram instead
-		m_bus[address - 0x2000] = data;
+		//Cannot write to Echo RAM, mirrors Main ram so writes to that address range instead.
+		memoryBus[address - 0x2000] = data;
 		return;
 	}
 
 	// I/O
-	if (InMemoryRange(0xFF00, 0xFF7F, address)) // High Frequancy
+	if (InMemoryRange(0xFF00, 0xFF7F, address))
 	{
 		switch (address)
 		{
-		case 0xFF00: // Input
+		case 0xFF00: // Joypad Register
 		{
-			m_bus[address] = data;
-			UpdateJoyPad();
+			memoryBus[address] = data;
+			UpdateJoyPad(); //Update the Joypad clock
 			break;
 		}
 		case 0xFF04: // Timer divider
 		{
-			m_bus[address] = 0x0;
+			memoryBus[address] = 0x0;
 			break;
 		}
 		case 0xFF05: // Timer divider
@@ -187,7 +182,7 @@ void GB::WriteData(ui16 address, ui8 data)
 			{
 				std::cout << "Tima " << std::hex << (int)data << std::endl;
 			}
-			m_bus[address] = data;
+			memoryBus[address] = data;
 			break;
 		}
 		case 0xFF07: // Timer Control
@@ -200,18 +195,18 @@ void GB::WriteData(ui16 address, ui8 data)
 			SetTimerControl(data);
 			break;
 		}
-		case 0xFF0F: // IF
+		case 0xFF0F: // 
 		{
 			if (DEBUGGING)
 			{
 				std::cout << "IF register " << std::hex << (int)data << std::endl;
 			}
-			m_bus[address] = data;
+			memoryBus[address] = data;
 			break;
 		}
 		case 0xFF40: // Video Control
 		{
-			m_bus[address] = data;
+			memoryBus[address] = data; //Turns the display on during the BIOS sequence
 			if (HasBit(data, 7))
 			{
 				EnableLCD();
@@ -224,7 +219,7 @@ void GB::WriteData(ui16 address, ui8 data)
 		}
 		case 0xFF44: // Video Line Val. Reset if wrote too
 		{
-			m_bus[address] = 0;
+			memoryBus[address] = 0;
 			break;
 		}
 		case 0xFF46: // Transfer Sprites DMA
@@ -232,13 +227,13 @@ void GB::WriteData(ui16 address, ui8 data)
 			DMATransfer(data);
 			break;
 		}
-		case 0xFF50: // Boot rom switch
+		case 0xFF50: // Boot ROM Switch, changes the first 256 bytes of data from the BIOS to the ROM
 		{
-				if (data == 0)
+				if (data == 0) //Adds the BIOS to the Memory Bus
 				{
 					for (int i = 0; i < BIOS_SIZE; i++)
 					{
-						m_bus[i] = BIOS[i];
+						memoryBus[i] = BIOS[i];
 					}
 				}
 				else
@@ -252,7 +247,7 @@ void GB::WriteData(ui16 address, ui8 data)
 					//	m_bus[i] = cartridgeMemory[i];
 					//}
 
-					memcpy(m_bus, m_cartridge->GetRawData(), BIOS_SIZE);
+					memcpy(memoryBus, cartridge->GetROMData(), BIOS_SIZE);
 
 					//DEBUGGING Display the first 256 bytes to see if bios has been overwritten
 					//for (int i = 0; i < BIOS_SIZE; i++)
@@ -261,54 +256,51 @@ void GB::WriteData(ui16 address, ui8 data)
 					//}
 
 				}
-			m_bus[address] = data;
+			memoryBus[address] = data;
 			break;
 		}
 		default:
 		{
-			m_bus[address] = data;
+			memoryBus[address] = data;
 		}
 		}
 		return;
 	}
 
 	// Cart Ram
-	if (InMemoryRange(0xA000, 0xBFFF, address)) // Med Frequancy
+	if (InMemoryRange(0xA000, 0xBFFF, address)) 
 	{
 		// To do: Cart Ram
-		m_cartridge->GetMBCRule()->Write(address, data);
+		cartridge->GetMBCType()->Write(address, data);
 		return;
 	}
 
 	// OAM - Object Attribute Memory
-	if (InMemoryRange(0xFE00, 0xFE9F, address)) // Med Frequancy
+	if (InMemoryRange(0xFE00, 0xFE9F, address))
 	{
-		m_bus[address] = data;
+		memoryBus[address] = data;
 		return;
 	}
 
 	// Cartridge ROM
 	if (InMemoryRange(0x0000, 0x7FFF, address)) // Writing to the ROM is parsed through the MBC to change ROM/RAM
 	{
-		// To do: MBC Rule change
-		m_cartridge->GetMBCRule()->Write(address, data);
+		cartridge->GetMBCType()->Write(address, data);
 		return;
 	}
 
 	// Interrupt https://www.reddit.com/r/EmuDev/comments/6sxb09/gb_tetris_stuck_at_copyright_screen/
-	if (address == 0xFFFF) // Low Frequancy
+	if (address == 0xFFFF) 
 	{
-		m_bus[address] = data;
+		memoryBus[address] = data;
 		return;
 	}
-
-	// Other uncaught Write commands
-	m_bus[address] = data;
+	memoryBus[address] = data; //Incase an instruction sneaks past
 }
 
 ui8& GB::ReadData(ui16 address)
 {
-	return m_bus[address];
+	return memoryBus[address];
 }
 
 bool GB::InMemoryRange(ui16 start, ui16 end, ui16 address)
@@ -343,7 +335,7 @@ ui16 GB::ReadWord()
 	return data; //returns the Word
 }
 
-i8 GB::ReadSignedByte()
+i8 GB::ReadSignedByte() //Casts to i8
 {
 	i8 result = static_cast<i8>(*dynamicPtr);
 	cycle += 4; // Each read takes 1m / 4t
@@ -361,7 +353,6 @@ ui16& GB::GetWordRegister(ui8 reg)
 	return register16bit[reg];
 }
 
-//** SET
 void GB::SetByteRegister(ui8 reg, ui8 value)
 {
 	register8bit[reg] = value; //sets the 8-bit register
@@ -369,7 +360,7 @@ void GB::SetByteRegister(ui8 reg, ui8 value)
 
 void GB::SetWordRegister(ui8 reg, ui16 value)
 {
-	register16bit[reg] = value; //sets the 16bit register
+	register16bit[reg] = value; //sets the 16-bit register
 }
 
 
@@ -380,11 +371,11 @@ ui8 GB::ReadNextCode()
 
 	if (!haltBug)
 	{
-		IncrementPC();
+		IncrementPC(); //Continue as normal
 	}
 	else
 	{
-		// If we have the halt bug, stay where we are and dont inc
+		// If we have the halt bug, don't increment the PC register
 		haltBug = false;
 	}
 	return result;
@@ -393,21 +384,21 @@ ui8 GB::ReadNextCode()
 void GB::IncrementPC()
 {
 	GetWordRegister(PC_REGISTER)++;
-	dynamicPtr++; //Moves the pointer
+	dynamicPtr++; 
 }
 
 void GB::DecrementPC()
 {
 	GetWordRegister(PC_REGISTER)--;
-	dynamicPtr--; //Move the pointer
+	dynamicPtr--; 
 }
 
 inline void GB::SetPC(const ui16& value)
 {
 	register16bit[PC_REGISTER] = value;
-	dynamicPtr = &m_bus[value];
+	dynamicPtr = &memoryBus[value];
 
-	cycle += 4;
+	cycle += 4; //Additional timing requirement
 }
 
 bool GB::HasBit(ui8& data, ui8 bit)
@@ -504,7 +495,7 @@ void GB::INCByteRegister(const ui8& reg) //Increments register and sets flags (Z
 
 	SetFlag(FLAG_HALFCARRY, (GetByteRegister(reg) & 0x0F) == 0x00);
 
-	//http://www.z80.info/z80syntx.htm#INC <- helpful information on INC
+	//http://www.z80.info/z80syntx.htm#INC <- helpful information on INC (NOT ACCURATE FOR GAMEBOY!!!)
 	//https://stackoverflow.com/questions/8868396/gbz80-what-constitutes-a-half-carry HOW HALF CARRY WORKS
 	//https://robdor.com/2016/08/10/gameboy-emulator-half-carry-flag/ //Explanation
 	//https://github.com/taisel/GameBoy-Online/blob/master/js/GameBoyCore.js#L588 //Lazy way
@@ -549,8 +540,8 @@ void GB::ClearFlags() /////////
 
 void GB::Jr()
 {
-	ui16 currentPC = GetWordRegister(PC_REGISTER); //Get the current PC value
-	ui16 newPC = currentPC + 1 + static_cast<i8>(ReadByte());
+	ui16 currentPC = GetWordRegister(PC_REGISTER); 
+	ui16 newPC = currentPC + 1 + static_cast<i8>(ReadByte()); //Cast to signed int so that the jump can go backwards
 	SetPC(newPC);
 }
 
@@ -561,20 +552,20 @@ void GB::Jr(const ui16& address)
 
 void GB::ADDHL(const ui16& reg)
 {
-	int result = GetWordRegister(HL_REGISTER) + reg;
+	int result = GetWordRegister(HL_REGISTER) + reg; //Save the result
 
-	bool hasZero = CheckFlag(FLAG_ZERO);
+	bool hasZero = CheckFlag(FLAG_ZERO); //Save the zero flag
 
 	ClearFlags();
 	
-	SetFlag(FLAG_ZERO, hasZero);
+	SetFlag(FLAG_ZERO, hasZero); //Reset back to original
 
-	if (result & 0x10000)
+	if (result & 0x10000) //Max value
 	{
 		SetFlag(FLAG_CARRY, true);
 	}
 
-	if ((GetWordRegister(HL_REGISTER) ^ reg ^ (result & 0xFFFF)) & 0x1000)
+	if ((GetWordRegister(HL_REGISTER) ^ reg ^ (result & 0x10000)) & 0x1000) //Half of the bits set
 	{
 		SetFlag(FLAG_HALFCARRY, true);
 	}
@@ -604,8 +595,8 @@ void GB::XOR(const ui8& value)
 
 void GB::OR(const ui8& value)
 {
-	ui8 a = GetByteRegister(A_REGISTER);
-	ui8 result = a | value;
+	ui8 Temp_A = GetByteRegister(A_REGISTER);
+	ui8 result = Temp_A | value;
 
 	SetByteRegister(A_REGISTER, result);
 
@@ -677,7 +668,7 @@ void GB::RLC(ui8& reg, bool A)
 	}
 }
 
-void GB::RR(ui8& reg, bool A)
+void GB::RR(ui8& reg, bool A) //Rotate bits Right
 {
 	ui8 carry = CheckFlag(FLAG_CARRY) ? 0x80 : 0x00;
 
@@ -717,7 +708,7 @@ void GB::RRC(ui8& reg, bool A)
 	}
 }
 
-void GB::CP(const ui8& value)
+void GB::CP(const ui8& value) //Compare
 {
 	ui8 reg = GetByteRegister(A_REGISTER);
 
@@ -727,11 +718,11 @@ void GB::CP(const ui8& value)
 	SetFlag(FLAG_HALFCARRY, ((reg - value) & 0xF) > (reg & 0xF));
 }
 
-void GB::SUB(const ui8& value)
+void GB::SUB(const ui8& value) //Sub from A then write back to A
 {
-	int current_register = GetByteRegister(A_REGISTER);
-	int result = current_register - value;
-	int carrybits = current_register ^ value ^ result;
+	int currentReg = GetByteRegister(A_REGISTER);
+	int result = currentReg - value;
+	int carryBits = currentReg ^ value ^ result;
 
 	SetByteRegister(A_REGISTER, static_cast<ui8>(result));
 
@@ -741,22 +732,22 @@ void GB::SUB(const ui8& value)
 
 	SetFlag(FLAG_ZERO, static_cast<ui8>(result) == 0);
 
-	if ((carrybits & 0x100) != 0)
+	if ((carryBits & 0x100) != 0)
 	{
 		SetFlag(FLAG_CARRY, true);
 	}
-	if ((carrybits & 0x10) != 0)
+	if ((carryBits & 0x10) != 0)
 	{
 		SetFlag(FLAG_HALFCARRY, true);
 	}
 }
 
-void GB::SBC(const ui8& value)
+void GB::SBC(const ui8& value) //Sum of value and carry subtracted from A
 {
-	ui8 a_reg = GetByteRegister(A_REGISTER);
+	ui8 Temp_A = GetByteRegister(A_REGISTER);
 
 	int carry = CheckFlag(FLAG_CARRY) ? 1 : 0;
-	int result = a_reg - value - carry;
+	int result = Temp_A - value - carry;
 
 	ClearFlags();
 	SetFlag(FLAG_SUBTRACT, true);
@@ -766,7 +757,7 @@ void GB::SBC(const ui8& value)
 		SetFlag(FLAG_CARRY, true);
 	}
 
-	if (((a_reg & 0x0F) - (value & 0x0F) - carry) < 0)
+	if (((Temp_A & 0x0F) - (value & 0x0F) - carry) < 0)
 	{
 		SetFlag(FLAG_HALFCARRY, true);
 	}
@@ -775,7 +766,7 @@ void GB::SBC(const ui8& value)
 	SetByteRegister(A_REGISTER, static_cast<ui8> (result));
 }
 
-void GB::ADD(const ui8& reg, const ui8& value)
+void GB::ADD(const ui8& reg, const ui8& value) //Sum of value and carry added from A
 {
 	int result = GetByteRegister(reg) + value;
 	int carrybits = GetByteRegister(reg) ^ value ^ result;
@@ -789,7 +780,7 @@ void GB::ADD(const ui8& reg, const ui8& value)
 	SetFlag(FLAG_SUBTRACT, false);
 }
 
-void GB::ADC(const ui8& value)
+void GB::ADC(const ui8& value) //Sum of operands plus carry flag, written to A
 {
 	int carry = CheckFlag(FLAG_CARRY) ? 1 : 0;
 	int result = GetByteRegister(A_REGISTER) + value + carry;
@@ -802,7 +793,7 @@ void GB::ADC(const ui8& value)
 	SetByteRegister(A_REGISTER, static_cast<ui8> (result));
 }
 
-void GB::AND(const ui8& value)
+void GB::AND(const ui8& value) // AND operation
 {
 	ui8 result = GetByteRegister(A_REGISTER) & value;
 
@@ -813,7 +804,7 @@ void GB::AND(const ui8& value)
 	SetFlag(FLAG_HALFCARRY, true);
 }
 
-void GB::SLA(ui8& value)
+void GB::SLA(ui8& value) //Shifts to the left by 1
 {
 	ClearFlags();
 	if ((value & 0x80) != 0)
@@ -825,7 +816,7 @@ void GB::SLA(ui8& value)
 	SetFlag(FLAG_ZERO, value == 0);
 }
 
-void GB::SRA(ui8& value)
+void GB::SRA(ui8& value) //Shifts to the right by 1 keeps bit 7
 {
 	ClearFlags();
 	if ((value & 0x01) != 0)
@@ -846,12 +837,12 @@ void GB::SRA(ui8& value)
 	SetFlag(FLAG_ZERO, value == 0);
 }
 
-void GB::Swap(ui8& value)
+void GB::Swap(ui8& value) //Swaps low and high bits
 {
-	ui8 low_half = value & 0x0F;
-	ui8 high_half = (value >> 4) & 0x0F;
+	ui8 low = value & 0x0F;
+	ui8 high = (value >> 4) & 0x0F;
 
-	value = (low_half << 4) + high_half;
+	value = (low << 4) + high;
 
 
 	SetFlag(FLAG_ZERO, value == 0);
@@ -860,7 +851,7 @@ void GB::Swap(ui8& value)
 	SetFlag(FLAG_SUBTRACT, false);
 }
 
-void GB::SRL(ui8& value)
+void GB::SRL(ui8& value) //SRA but changes bit 7
 {
 	ClearFlags();
 	if ((value & 0x01) != 0)
@@ -871,7 +862,7 @@ void GB::SRL(ui8& value)
 	SetFlag(FLAG_ZERO, value == 0);
 }
 
-void GB::Frame()
+void GB::Frame() //Draws a frame of the Gameboy
 {
 	while(!TickCPU());
 	cycles = 0;
@@ -880,7 +871,7 @@ void GB::Frame()
 
 bool GB::TickCPU()
 {
-	cycle = 0;
+	cycle = 0; //Reset the cycles
 
 	if (halt)
 	{
@@ -899,10 +890,10 @@ bool GB::TickCPU()
 		}
 		else
 		{
-			ui8& interupt_flags = ReadData(m_cpu_interupt_flag_address);
-			ui8& interupt_enabled_flags = ReadData(m_interrupt_enabled_flag_address);
+			ui8& interuptFlag = ReadData(CPU_INTERUPT_REGISTER);
+			ui8& interuptsEnabledFlag = ReadData(INTERUPT_ENABLED_REGISTER);
 
-			ui8 interuptsToProcess = interupt_flags & interupt_enabled_flags;
+			ui8 interuptsToProcess = interuptFlag & interuptsEnabledFlag;
 
 			if (halt && interuptsToProcess > 0)
 			{
@@ -963,11 +954,9 @@ bool GB::TickCPU()
 
 		}
 	}
-
-	
-	TickClock();
-	bool vSync = updatePixels();
-	JoyPadTick();
+	TickClock(); //Clock Frequency
+	bool frameDrawn = UpdatePixels(); //Display
+	TickJoypad(); //Joypad cycles
 
 	if (IECycles > 0)
 	{
@@ -980,9 +969,7 @@ bool GB::TickCPU()
 		}
 	}
 
-	cycles += cycle;
-
-	return vSync;
+	return frameDrawn; //Returns true once the entire framebuffer is completely drawn
 }
 
 void GB::TickClock()
@@ -990,11 +977,12 @@ void GB::TickClock()
 	//https://hacktix.github.io/GBEDG/timers/
 	deviderCounter += cycle;
 
-	ui8& timer_control = ReadData(m_timer_controll_address);
-	ui8& timer = ReadData(m_timer_address);
-	ui8& timer_modulo = ReadData(m_timer_modulo_address);
+	
+	ui8& timerControl = ReadData(TIMER_CONTROL_REGISTER);
+	ui8& timer = ReadData(TIMA_REGISTER);
+	ui8& timerModulo = ReadData(TIMER_MODULO_REGISTER);
 
-	if (HasBit(timer_control, 2)) //If the timer is enabled
+	if (HasBit(timerControl, 2)) //If the timer is enabled
 	{
 		timerCounter += cycle;
 
@@ -1006,7 +994,7 @@ void GB::TickClock()
 			timerCounter -= clockFreq;
 			if (timer == 0xFF)
 			{
-				timer = timer_modulo;
+				timer = timerModulo;
 				RequestInterupt(TIMER);
 			}
 			else
@@ -1016,23 +1004,24 @@ void GB::TickClock()
 		}
 	}
 
-	//Incrementing the divider register
+	//Incrementing the devider register
 	if (deviderCounter >= 256)
 	{
 		deviderCounter -= 256;
 
-		ReadData(m_timer_divider_address)++;
+		ReadData(TIMER_DIV_REGISTER)++;
 	}
 
 	// 00: CPU Clock  /1024  (DMG, CGB:   4096 Hz,   SGB : ~4194 Hz)
 	// 01 : CPU Clock /16    (DMG, CGB:   262144 Hz, SGB : ~268400 Hz)
 	// 10 : CPU Clock /64    (DMG, CGB:   65536 Hz,  SGB : ~67110 Hz)
 	// 11 : CPU Clock /256   (DMG, CGB:   16384 Hz,  SGB : ~16780 Hz)
+	//CLOCK SPEEDS
 }
 
 void GB::ClockFrequency()
 {
-	switch (ReadData(m_timer_controll_address) & 0x03)
+	switch (ReadData(TIMER_CONTROL_REGISTER) & 0x03)
 	{
 	case 0:
 		clockFreq = 1024; // Frequency 4096
@@ -1051,10 +1040,10 @@ void GB::ClockFrequency()
 
 void GB::SetTimerControl(ui8 data)
 {
-	ui8 current = ReadData(m_timer_controll_address);
-	ReadData(m_timer_controll_address) = data;
-	ui8 new_data = ReadData(m_timer_controll_address);
-	if (new_data != current)
+	ui8 current = ReadData(TIMER_CONTROL_REGISTER);
+	ReadData(TIMER_CONTROL_REGISTER) = data;
+	ui8 newControl = ReadData(TIMER_CONTROL_REGISTER);
+	if (newControl != current)
 	{
 		ClockFrequency();
 	}
@@ -1062,22 +1051,21 @@ void GB::SetTimerControl(ui8 data)
 
 void GB::RequestInterupt(CPUInterupt interupt)
 {
-	ReadData(m_cpu_interupt_flag_address) |= 1 << (ui8)interupt;
+	ReadData(CPU_INTERUPT_REGISTER) |= 1 << (ui8)interupt;
 }
 
 void GB::UpdateLCDStatus()
 {
-	ui8& status = ReadData(0xFF41);
-	// Set mode to memory //what is this i don't know
+	ui8& status = ReadData(STATUS_REGISTER); //Updates
 	status = (status & 0xFC);
 }
 
 void GB::CheckInterrupts()
 {
-	ui8& interupt_flags = ReadData(m_cpu_interupt_flag_address);
-	ui8& interupt_enabled_flags = ReadData(m_interrupt_enabled_flag_address);
+	ui8& interuptFlags = ReadData(CPU_INTERUPT_REGISTER);
+	ui8& interuptEnabledFlags = ReadData(INTERUPT_ENABLED_REGISTER);
 
-	ui8 interuptsToProcess = interupt_flags & interupt_enabled_flags; //figure out how this works
+	ui8 interuptsToProcess = interuptFlags & interuptEnabledFlags; //Combines the interupts with the enabled interupts to total the number of interupts to be processed.
 	if (DEBUGGING)
 	{
 		/*std::cout << "Interrupts flags" << std::bitset<8>((int)interupt_flags) << std::endl;
@@ -1085,18 +1073,17 @@ void GB::CheckInterrupts()
 		//std::cout << "Interrupts to process" <<  (int)interuptsToProcess << std::endl;
 	}
 
-
 	if (interuptsToProcess > 0)
 	{
 		if (interruptsEnabled)
 		{
 			// Loop through for all possible interrupts 
-			for (int i = 0; i < 8; i++)
+			for (int i = 0; i < 4; i++)
 			{
-				if (HasBit(interupt_flags, i))
+				if (HasBit(interuptFlags, i))
 				{
 					halt = false;
-					ClearBit(interupt_flags, i);
+					ClearBit(interuptFlags, i);
 					PushStack(PC_REGISTER); //Store PC
 					switch (i)
 					{
@@ -1116,11 +1103,11 @@ void GB::CheckInterrupts()
 						SetPC(0x0060);
 						break;
 					default:
-						assert(0 && "Unknown interupt");
+						assert(0 && "Uh oh.");
 						break;
 					}
 
-					cycles += 20;
+					cycles += 20; //Hidden cost
 
 					return;
 				}
@@ -1136,15 +1123,15 @@ void GB::CheckInterrupts()
 
 void GB::CompareLYWithLYC()
 {
-	ui8 controlBit = ReadData(lcdcRegister); // Get the LCDC register from the CPU
-	ui8 line = ReadData(LYRegister);
+	ui8& controlBit = ReadData(LCDC_REGISTER); // Get the LCDC register from the CPU
+	ui8& line = ReadData(LY_REGISTER);
 
 	bool isDisplayEnabled = HasBit(controlBit, 7);
 
 	if (isDisplayEnabled)
 	{
-		ui8 status = ReadData(statusRegister);
-		ui8 LYC = ReadData(lycRegister);
+		ui8& status = ReadData(STATUS_REGISTER);
+		ui8& LYC = ReadData(LYC_REGISTER);
 
 		if (LYC == line)
 		{
@@ -1442,10 +1429,10 @@ void GB::OP76()
 		halt = true;
 
 		/* Check for halt bug */
-		ui8 interruptEnabledFlag = ReadData(m_interrupt_enabled_flag_address);
-		ui8 interruptFlag = ReadData(m_cpu_interupt_flag_address);
+		ui8 interruptEnabledFlag = ReadData(INTERUPT_ENABLED_REGISTER);
+		ui8 interruptFlag = ReadData(CPU_INTERUPT_REGISTER);
 
-		// When interupts are dissabled HALT skips a pc instruction, we dont want this
+		// When interupts are disabled HALT skips a pc instruction, we dont want this
 		if (!interruptsEnabled && (interruptFlag & interruptEnabledFlag & 0x1F))
 		{
 			haltBug = true;
@@ -1709,7 +1696,7 @@ void GB::OPE9()
 	ui16& address = GetWordRegister(HL_REGISTER);
 	//SetPCRegister(address);
 	SetWordRegister(PC_REGISTER, address);
-	dynamicPtr = &m_bus[address];
+	dynamicPtr = &memoryBus[address];
 }; // JP HL
 void GB::OPEA() { WriteData(ReadWord(), GetByteRegister(A_REGISTER)); cycle += 4; };  //LD (FF00+u8), A
 void GB::OPEB() {assert("Invalid CPU Instruction" && 0);};
@@ -2721,7 +2708,7 @@ void PrintHex(int value)
 	std::cout << std::setfill('0') << std::setw(2) << std::hex << value;
 }
 
-void GB::OUTPUTREGISTERS(ui8 op)
+void GB::OUTPUTREGISTERS(ui8 op) //Basic implementation used for debugging the current state of the system (Can be greatly improved through IMGUI and loops)
 {
 	std::cout << "*******************************************************" << std::endl;
 	std::cout << "Current OPCode is: " << std::hex << OPInstruction[op] << " Instruction: " << "0x" << (int)op << std::endl;
@@ -2769,39 +2756,39 @@ void GB::OUTPUTREGISTERS(ui8 op)
 	std::cout << std::endl << std::endl;
 
 	std::cout << "0xFF11 is ";
-	PrintHex(m_bus[0xFF11]);
+	PrintHex(memoryBus[0xFF11]);
 	std::cout << "                   0xFF12 is ";
-	PrintHex(m_bus[0xFF12]);
+	PrintHex(memoryBus[0xFF12]);
 	std::cout << std::endl;
 
 	std::cout << "0xFF24 is ";
-	PrintHex(m_bus[0xFF24]);
+	PrintHex(memoryBus[0xFF24]);
 	std::cout << "                   0xFF47 is ";
-	PrintHex(m_bus[0xFF47]);
+	PrintHex(memoryBus[0xFF47]);
 	std::cout << std::endl;
 
 	std::cout << "0xFF44 is ";
-	PrintHex(m_bus[0xFF44]);
+	PrintHex(memoryBus[0xFF44]);
 	std::cout << "                   0xFF40 is ";
-	PrintHex(m_bus[0xFF40]);
+	PrintHex(memoryBus[0xFF40]);
 	std::cout << std::endl;
 
 	std::cout << "0xFF42 is ";
-	PrintHex(m_bus[0xFF42]);
+	PrintHex(memoryBus[0xFF42]);
 	std::cout << "                   0xFF85 is ";
-	PrintHex(m_bus[0xFF85]);
+	PrintHex(memoryBus[0xFF85]);
 	std::cout << std::endl;
 
 	std::cout << "0xFF00 is ";
-	PrintHex(m_bus[0xFF00]);
+	PrintHex(memoryBus[0xFF00]);
 	std::cout << "                   0xFF0f is ";
-	PrintHex(m_bus[0xFF0f]);
+	PrintHex(memoryBus[0xFF0f]);
 	std::cout << std::endl;
 
 	std::cout << "0xFF07 is ";
-	PrintHex(m_bus[0xFF07]);
+	PrintHex(memoryBus[0xFF07]);
 	std::cout << "                   0xFF05 is ";
-	PrintHex(m_bus[0xFF05]);
+	PrintHex(memoryBus[0xFF05]);
 	std::cout << std::endl;
 
 	std::cout << std::bitset<8>(register8bit[F_REGISTER]) << "<- Flags" << std::endl;
@@ -2861,39 +2848,39 @@ void GB::OUTPUTCBREGISTERS(ui8 op)
 	std::cout << std::endl;
 
 	std::cout << "0xFF11 is ";
-	PrintHex(m_bus[0xFF11]);
+	PrintHex(memoryBus[0xFF11]);
 	std::cout << "                   0xFF12 is ";
-	PrintHex(m_bus[0xFF12]);
+	PrintHex(memoryBus[0xFF12]);
 	std::cout << std::endl;
 
 	std::cout << "0xFF24 is ";
-	PrintHex(m_bus[0xFF24]);
+	PrintHex(memoryBus[0xFF24]);
 	std::cout << "                   0xFF47 is ";
-	PrintHex(m_bus[0xFF47]);
+	PrintHex(memoryBus[0xFF47]);
 	std::cout << std::endl;
 
 	std::cout << "0xFF44 is ";
-	PrintHex(m_bus[0xFF44]);
+	PrintHex(memoryBus[0xFF44]);
 	std::cout << "                   0xFF40 is ";
-	PrintHex(m_bus[0xFF40]);
+	PrintHex(memoryBus[0xFF40]);
 	std::cout << std::endl;
 
 	std::cout << "0xFF42 is ";
-	PrintHex(m_bus[0xFF42]);
+	PrintHex(memoryBus[0xFF42]);
 	std::cout << "                   0xFF85 is ";
-	PrintHex(m_bus[0xFF85]);
+	PrintHex(memoryBus[0xFF85]);
 	std::cout << std::endl;
 
 	std::cout << "0xFF00 is ";
-	PrintHex(m_bus[0xFF00]);
+	PrintHex(memoryBus[0xFF00]);
 	std::cout << "                   0xFF0f is ";
-	PrintHex(m_bus[0xFF0f]);
+	PrintHex(memoryBus[0xFF0f]);
 	std::cout << std::endl;
 
 	std::cout << "0xFF07 is ";
-	PrintHex(m_bus[0xFF07]);
+	PrintHex(memoryBus[0xFF07]);
 	std::cout << "                   0xFF05 is ";
-	PrintHex(m_bus[0xFF05]);
+	PrintHex(memoryBus[0xFF05]);
 	std::cout << std::endl;
 
 	std::cout << std::bitset<8>(register8bit[F_REGISTER]) << std::endl;
@@ -2905,32 +2892,32 @@ void GB::OUTPUTCBREGISTERS(ui8 op)
 	std::cout << std::endl;
 }
 
-void GB::JoyPadTick()
+void GB::TickJoypad()
 {
-	m_joypadCycles += cycle;
-	if (m_joypadCycles >= joypadCyclesRefresh)
+	joypadCycles += cycle;
+	if (joypadCycles >= JOYPAD_CYCLES)
 	{
 		UpdateJoyPad();
-		m_joypadCycles = 0;
+		joypadCycles = 0;
 	}
 }
 
 void GB::UpdateJoyPad()
 {
-	ui8 current = bus.io.joypad & 0xF0;
+	ui8 current = bus.io.joypad & 0xF0; 
 
 	switch (current & 0x30)
 	{
-	case 0x10:
+	case 0x10: //Bit 5
 	{
-		ui8 topJoypad = (joypadActual >> 4) & 0x0F;
-		current |= topJoypad;
+		ui8 InputButtons = (joypadRegister >> 4) & 0x0F;
+		current |= InputButtons;
 		break;
 	}
-	case 0x20:
+	case 0x20: //Bit 6
 	{
-		ui8 bottomJoypad = joypadActual & 0x0F;
-		current |= bottomJoypad;
+		ui8 directionsButtons = joypadRegister & 0x0F;
+		current |= directionsButtons;
 		break;
 	}
 	case 0x30:
@@ -2946,36 +2933,30 @@ void GB::UpdateJoyPad()
 
 void GB::KeyPress(int key)
 {
-	//bool previouslyUnset = false;
-
-	//if (!HasBit(joypadActual, key))
-	//{
-	//	previouslyUnset = true;
-	//}
-	ClearBit(joypadActual, key);
+	ClearBit(joypadRegister, key);
 }
 
 void GB::KeyRelease(int key)
 {
-	SetBit(joypadActual, key);
+	SetBit(joypadRegister, key);
 }
 
 void GB::HandleInput(SDL_Event& event)
 {
-	if (event.type == SDL_KEYDOWN) //If a key has been pressed on the gameboy
+	if (event.type == SDL_KEYDOWN) //If a key has been pressed on the keyboard (could be remapped to a controller?)
 	{
 		int key = -1;
-		switch (event.key.keysym.sym)
+		switch (event.key.keysym.sym) 
 		{
-		case SDLK_z:        key = A;    break;
-		case SDLK_x:        key = B;    break;
-		case SDLK_RETURN:   key = START;    break;
+		case SDLK_z:        key = A;		 break;
+		case SDLK_x:        key = B;		 break;
+		case SDLK_RETURN:   key = START;	 break;
 		case SDLK_SPACE:    key = SELECT;    break;
-		case SDLK_RIGHT:    key = RIGHT;    break;
-		case SDLK_LEFT:     key = LEFT;    break;
-		case SDLK_UP:       key = UP;    break;
-		case SDLK_DOWN:     key = DOWN;    break;
-		default:            key = -1;   break;
+		case SDLK_RIGHT:    key = RIGHT;	 break;
+		case SDLK_LEFT:     key = LEFT;		 break;
+		case SDLK_UP:       key = UP;		 break;
+		case SDLK_DOWN:     key = DOWN;		 break;
+		default:            key = -1;		 break;
 		}
 		if (key != -1)
 		{
@@ -2985,18 +2966,17 @@ void GB::HandleInput(SDL_Event& event)
 	else if (event.type == SDL_KEYUP)
 	{
 		int key = -1;
-
 		switch (event.key.keysym.sym)
 		{
-		case SDLK_z:        key = 4;    break;
-		case SDLK_x:        key = 5;    break;
-		case SDLK_RETURN:   key = 7;    break;
-		case SDLK_SPACE:    key = 6;    break;
-		case SDLK_RIGHT:    key = 0;    break;
-		case SDLK_LEFT:     key = 1;    break;
-		case SDLK_UP:       key = 2;    break;
-		case SDLK_DOWN:     key = 3;    break;
-		default:            key = -1;   break;
+		case SDLK_z:        key =  4;		 break;
+		case SDLK_x:        key =  5;		 break;
+		case SDLK_RETURN:   key =  7;		 break;
+		case SDLK_SPACE:    key =  6;		 break;
+		case SDLK_RIGHT:    key =  0;		 break;
+		case SDLK_LEFT:     key =  1;		 break;
+		case SDLK_UP:       key =  2;		 break;
+		case SDLK_DOWN:     key =  3;		 break;
+		default:            key = -1;		 break;
 		}
 		if (key != -1)
 		{
@@ -3005,16 +2985,11 @@ void GB::HandleInput(SDL_Event& event)
 	}
 }
 
-bool GB::createSDLWindow()
+bool GB::createSDLWindow() //Sets up the SDL components needed for the emulator
 {
-	//if (SDL_Init(SDL_INIT_EVERYTHING) < 0)
-	//{
-	//	return false;
-	//}
-
 	SDL_Init(SDL_INIT_VIDEO);
 
-	window = SDL_CreateWindow("CrosBOY", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, DISPLAY_WIDTH * windowMultiplier, DISPLAY_HEIGHT * windowMultiplier, SDL_WINDOW_ALLOW_HIGHDPI);
+	window = SDL_CreateWindow("CrosBOY", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, DISPLAY_WIDTH * WINDOW_MULTIPLIER, DISPLAY_HEIGHT * WINDOW_MULTIPLIER, SDL_WINDOW_ALLOW_HIGHDPI);
 
 	render = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
@@ -3025,13 +3000,11 @@ bool GB::createSDLWindow()
 
 void GB::DisableLCD()
 {
-	ui8& line = ReadData(LYRegister);
-	//lcdEnabled = false;
+	ui8& line = ReadData(LY_REGISTER);
 	line = 0;
-	//currentMode = H_BLANK;
 
 	UpdateLCDStatus();
-	ui8& status = ReadData(statusRegister);
+	ui8& status = ReadData(STATUS_REGISTER);
 	if (HasBit(status, 5))
 	{
 		RequestInterupt(LCD);
@@ -3041,19 +3014,19 @@ void GB::DisableLCD()
 
 void GB::EnableLCD()
 {
-	ui8& control = ReadData(lcdcRegister); // Get the LCDC register from the CPU
+	ui8& control = ReadData(LCDC_REGISTER); // Get the LCDC register from the CPU
 
 	if (HasBit(control, 7)) // Is the screen on
 	{
-		displayEnableDelay = 244;
+		displayEnableDelay = 244; //Display takes time to catch up to the CPU to turn on
 	}
 }
 
-bool GB::updatePixels()
+bool GB::UpdatePixels()
 {
-	ui8& controlBit = ReadData(lcdcRegister); // Get the LCDC register from the CPU
-	ui8& statusControl = ReadData(statusRegister);
-	ui8& line = ReadData(LYRegister);
+	ui8& controlBit = ReadData(LCDC_REGISTER); // Get the LCDC register from the CPU
+	ui8& statusControl = ReadData(STATUS_REGISTER);
+	ui8& line = ReadData(LY_REGISTER);
 
 	bool isDisplayEnabled = HasBit(controlBit, 7);
 
@@ -3062,20 +3035,16 @@ bool GB::updatePixels()
 	if (isDisplayEnabled && lcdEnabled)
 	{
 		videoCycles += cycle; //update the cycles (time passed) from the CPU
-		switch (currentMode)
+		switch (currentMode) //Cycle through the Display modes
 		{
 		case 0:
 		{
-			if (line == 0x8f)
-			{
-				//std::cout << "hello" << std::endl;
-			}
 			handleHBlankMode(line);
 		}
 		break;
 		case 1: 
 		{
-			handleVBlankMode(line, cycle);
+			handleVBlankMode(line);
 		}
 		break;
 		case 2:
@@ -3101,7 +3070,7 @@ bool GB::updatePixels()
 				lcdEnabled = true;
 				displayEnableDelay = 0;
 				videoCycles = 0;
-				ReadData(LYRegister) = 0;
+				ReadData(LY_REGISTER) = 0;
 
 				currentMode = H_BLANK;
 				UpdateLCDStatus();
@@ -3122,10 +3091,11 @@ bool GB::updatePixels()
 	return vBlank;
 }
 
-void GB::drawScanline()
+void GB::DrawScanline()
 {
-	ui8& line = ReadData(LYRegister);
-	ui8& control = ReadData(lcdcRegister); // Get the LCDC register from the CPU
+	ui8& line = ReadData(LY_REGISTER);
+	ui8& control = ReadData(LCDC_REGISTER); // Get the LCDC register from the CPU
+	ui8& windowY = ReadData(WINDOW_Y);
 
 	if (HasBit(control, 7)) // Is the screen on
 	{
@@ -3135,7 +3105,7 @@ void GB::drawScanline()
 
 			if (HasBit(control, 5)) // Is the window enabled
 			{
-				ui8& windowY = ReadData(WINDOW_Y);
+
 				if (line >= windowY)
 				{
 					RenderWindow(windowY);
@@ -3150,7 +3120,7 @@ void GB::drawScanline()
 	}
 }
 
-void GB::handleHBlankMode(ui8& line)
+void GB::handleHBlankMode(ui8& line) //Increments the line now that the entire row is drawn.
 {
 	if (videoCycles >= MIN_HBLANK_MODE_CYCLES)
 	{
@@ -3162,15 +3132,13 @@ void GB::handleHBlankMode(ui8& line)
 
 		CompareLYWithLYC();
 
-		ui8& lcdStatus = ReadData(lcdcRegister);
+		ui8& lcdStatus = ReadData(LCDC_REGISTER);
 
 		if (line == DISPLAY_HEIGHT)
 		{
 			currentMode = V_BLANK;
 
 			RequestInterupt(VBLANK);
-
-			//transfer the data to the pixels array?
 
 			//Check bit 4 of the LCDC
 			if (HasBit(lcdStatus, 4))
@@ -3193,7 +3161,7 @@ void GB::handleHBlankMode(ui8& line)
 	}
 }
 
-void GB::handleVBlankMode(ui8& line, int cycles)
+void GB::handleVBlankMode(ui8& line)
 {
 	if (videoCycles >= MAX_VIDEO_CYCLES)
 	{
@@ -3203,8 +3171,8 @@ void GB::handleVBlankMode(ui8& line, int cycles)
 
 		if (line > VERTICAL_BLANK_SCAN_LINE_MAX)
 		{
-			ui8& lcdStatus = ReadData(lcdcRegister);
-			line = 0;
+			ui8& lcdStatus = ReadData(LCDC_REGISTER);
+			line = 0; //Reset the current line to the top of the display
 			currentMode = OAM;
 			UpdateLCDStatus();
 
@@ -3234,9 +3202,9 @@ void GB::handleLCDTransferMode()
 	if (videoCycles >= MIN_LCD_TRANSFER_CYCLES)
 	{
 		videoCycles -= MIN_LCD_TRANSFER_CYCLES;
-		ui8& lcdStatus = ReadData(lcdcRegister);
+		ui8& lcdStatus = ReadData(LCDC_REGISTER);
 
-		drawScanline();
+		DrawScanline();
 
 		currentMode = H_BLANK;
 
@@ -3247,12 +3215,8 @@ void GB::handleLCDTransferMode()
 	}
 }
 
-void GB::RenderGame()
+void GB::RenderGame() //Moving the frame buffer over to the SDL Renderer
 {
-	/*SDL_UpdateTexture(screen_texture, NULL, this->frameBuffer, DISPLAY_WIDTH * 4);
-	SDL_RenderCopy(render, screen_texture, nullptr, nullptr);
-	SDL_RenderPresent(render);*/
-
 	void* pixels_ptr;
 	int pitch;
 	SDL_LockTexture(screen_texture, nullptr, &pixels_ptr, &pitch);
@@ -3267,12 +3231,12 @@ void GB::RenderGame()
 
 void GB::RenderBackground()
 {
-	ui8& control = ReadData(lcdcRegister);
+	ui8& control = ReadData(LCDC_REGISTER);
 
 	ui8& scrollY = ReadData(SCROLL_Y);
 	ui8& scrollX = ReadData(SCROLL_X);
 
-	ui8& line = ReadData(LYRegister);
+	ui8& line = ReadData(LY_REGISTER);
 
 	bool unsig = HasBit(control, 4); //Which tile set to use 1 or 2 (whether the data is signed or unsigned)
 
@@ -3302,7 +3266,7 @@ void GB::RenderBackground()
 	ui8 xPos = 0;
 	ui8 yPos = scrollY + line;
 
-	for (int i = 0; i < DISPLAY_WIDTH; i++)
+	for (int i = 0; i < DISPLAY_WIDTH; i++) //Render the entire line of tiles
 	{
 		xPos = i + scrollX;
 		yPos = scrollY + line;
@@ -3312,9 +3276,9 @@ void GB::RenderBackground()
 
 void GB::RenderWindow(ui8 windowY)
 {
-	ui8& control = ReadData(lcdcRegister);
+	ui8& control = ReadData(LCDC_REGISTER);
 
-	ui8& line = ReadData(LYRegister);
+	ui8& line = ReadData(LY_REGISTER);
 
 	ui8& windowX = ReadData(WINDOW_X);
 
@@ -3355,7 +3319,7 @@ void GB::RenderWindow(ui8 windowY)
 	ui8 xPos = 0;
 	ui8 yPos = 0;
 
-	for (int i = 0; i < 160; i++) //For the entire line of pixels
+	for (int i = 0; i < 160; i++) //For the entire line of tiles
 	{
 		xPos = i - windowX;
 		yPos = line - windowY;
@@ -3365,8 +3329,8 @@ void GB::RenderWindow(ui8 windowY)
 
 void GB::RenderSprites()
 {
-	ui8& control = ReadData(lcdcRegister);
-	
+	ui8& control = ReadData(LCDC_REGISTER);
+	ui8& line = ReadData(LY_REGISTER);
 
 	ui8 spriteHeight = 8;
 
@@ -3379,21 +3343,20 @@ void GB::RenderSprites()
 	{
 		//Get the position and Tile index of the sprite
 		ui8 index = sprite * 4; //A sprite is 4 bytes ( starting position of the sprite)
-
 		int yPos = ReadData(0xFE00 + index) - 16;
 		int xPos = ReadData(0xFE00 + index + 1) - 8;
-
 		int tileIndex = ReadData(0xFE00 + index + 2);
-		ui8 attributes = ReadData(0xFE00 + index + 3);
 
+		//Sprite Attributes
+		ui8 attributes = ReadData(0xFE00 + index + 3);
 		ui16 pallette = HasBit(attributes, 4) ? 0xFF49 : 0xFF48;
-		ui8& line = ReadData(LYRegister);
-		
+		ui8 backgroundPallette = ReadData(0xFF47);
+
 		bool xFlip = HasBit(attributes, 5);
 		bool yFlip = HasBit(attributes, 6);
 		bool spriteOnTop = !HasBit(attributes, 7);
 
-		if ((line >= yPos) && (line < (yPos + spriteHeight))) 
+		if ((line >= yPos) && (line < (yPos + spriteHeight))) // 
 		{
 			int spriteLine = line - yPos;
 
@@ -3403,47 +3366,39 @@ void GB::RenderSprites()
 				spriteLine *= -1;
 			}
 
-				spriteLine *= 2;
+			spriteLine *= 2;
 
 			ui16 dataAddress = (0x8000 + (tileIndex * 16)) + spriteLine;
 			ui8 upper = ReadData(dataAddress);
 			ui8 lower = ReadData(dataAddress + 1);
 
 			//Setting the pixel colours of the sprite tile
-			for (int tilePixel = 0; tilePixel < 8; ++tilePixel)
+			for (int tilePixel = 7; tilePixel >= 0; tilePixel--)
 			{
+				int xPix = 0 - tilePixel;
+				xPix += 7;
 
-				int pixel = xPos + tilePixel;
-
-				if (pixel < 0 || (pixel >= 160)) // 160 Gameboy width
-					continue;
+				int pixel = xPos + xPix;
 
 				if (pixel < 160 && line < 144)
 				{
 					int position = tilePixel;
-
+					ui8 colourNum = 0x00;
 					if (xFlip)
 					{
 						position -= 7;
 						position *= -1;
 					}
 
-					int colorX = xFlip ? tilePixel : 7 - tilePixel;
-
-					int colourNum = (ui8)(lower >> colorX) & 1; // Get the set bit
+					colourNum = (lower >> position) & 1; // Get the set bit
 					colourNum <<= 1;
-					colourNum |= (ui8)(upper >> colorX) & 1; // Get the set bit
+					colourNum |= (upper >> position) & 1;
 
-					if (colourNum != WHITE)
+					if (colourNum != WHITE) // Don't need to draw clear tiles
 					{
 						int pixelIndex = pixel + (DISPLAY_WIDTH * line);
-
-						ui8 color = (pallette >> (colourNum * 2)) & 0x03;
-
-						//pixelRGB colour = currentPallete[getColourFromPallette(pallette, colours(colourNum))];
-						//pixelRGB colour = currentPallete[pallette, color];
-						//pixelRGB colour = currentPallete[getColourFromPallette(pallette, colours(color))];
-						pixelRGB colour = currentPallete[pallette, colours(colourNum)];
+						//TODO: check if the sprite is on top (I think this is why the sprites are incorrect colours)
+						pixelRGB colour = currentPallete[(pallette, colours(colourNum))];
 						//Store them in the framebuffer
 						frameBuffer[pixelIndex * 4] = colour.blue;
 						frameBuffer[pixelIndex * 4 + 1] = colour.green;
@@ -3458,7 +3413,7 @@ void GB::RenderSprites()
 
 void GB::RenderTile(bool unsig, ui16 tileMap, ui16 tileData, ui8 xPos, ui8 yPos, ui8 pixel, ui8 pallette)
 {
-	ui8& line = ReadData(LYRegister);
+	ui8& line = ReadData(LY_REGISTER);
 	// which of the 8 vertical pixels of the current tile is the scanline on?
 	ui16 tileRow = (((ui8)(yPos / 8)) * 32);
 	// Out of the 32 horizontal tiles, what one are we currently on
@@ -3505,16 +3460,7 @@ void GB::RenderTile(bool unsig, ui16 tileMap, ui16 tileData, ui8 xPos, ui8 yPos,
 
 	int pixelIndex = pixel + (DISPLAY_WIDTH * line);
 	//Retrieve the colour values of the pixel from the pallette
-	pixelRGB colour = currentPallete[getColourFromPallette(pallette, colours(colourNum))];
-
-	//if (DEBUGGING)
-	//{
-	//	if (colourNum == BLACK)
-	//	{
-	//		std::cout << "hello" << std::endl;
-	//	}
-	//}
-
+	pixelRGB colour = currentPallete[(pallette, colours(colourNum))];
 
 	//Store them in the framebuffer
 	frameBuffer[pixelIndex * 4] = colour.blue;
@@ -3522,7 +3468,7 @@ void GB::RenderTile(bool unsig, ui16 tileMap, ui16 tileData, ui8 xPos, ui8 yPos,
 	frameBuffer[pixelIndex * 4 + 2] = colour.red;
 }
 
-void GB::switchPallete()
+void GB::switchPallete() //Used to switch between the different colour palettes
 {
 	if (currentPallete == classicPallette)
 	{
@@ -3542,59 +3488,8 @@ void GB::switchPallete()
 	}
 }
 
-colours GB::getColourFromPallette(ui8 pallete, colours originalColour)
+void GB::DMATransfer(const ui8 data) //Used for sprites
 {
-	ui8 colourNumber = 0;
-	switch (originalColour)
-	{
-	case WHITE:
-		if (HasBit(pallete, 1))
-		{
-			SetBit(colourNumber, 1);
-		}
-		if (HasBit(pallete, 0))
-		{
-			SetBit(colourNumber, 0);
-		}
-		break;
-	case LIGHT_GREY:
-		if (HasBit(pallete, 3))
-		{
-			SetBit(colourNumber, 1);
-		}
-		if (HasBit(pallete, 2))
-		{
-			SetBit(colourNumber, 0);
-		}
-		break;
-	case DARK_GREY:
-		if (HasBit(pallete, 5))
-		{
-			SetBit(colourNumber, 1);
-		}
-		if (HasBit(pallete, 4))
-		{
-			SetBit(colourNumber, 0);
-		}
-		break;
-	case BLACK:
-		if (HasBit(pallete, 7))
-		{
-			SetBit(colourNumber, 1);
-		}
-		if (HasBit(pallete, 6))
-		{
-			SetBit(colourNumber, 0);
-		}
-		break;
-	}
-
-	return colours(colourNumber);
-}
-
-void GB::DMATransfer(const ui8 data)
-{
-	// Sprite Data is at data * 100
 	ui16 address = data << 8;
 	for (int i = 0; i < 0xA0; i++)
 	{

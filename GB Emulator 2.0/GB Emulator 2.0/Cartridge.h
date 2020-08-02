@@ -11,7 +11,7 @@ typedef unsigned __int16 ui16; //16-bit Integer
 typedef signed __int16 i16;
 
 
-enum CartType
+enum CartType //All cartridge Types (for later cartridge implementation)
 {
 	ROM_ONLY = 0x00,
 	ROM_AND_MBC1 = 0x01,
@@ -52,8 +52,8 @@ const int RAM_SIZE = 0x0149;
 class Cartridge
 {
 public:
-    ui8* dynamicMemory = nullptr;
-    ui8* ram = nullptr;
+    ui8* ROMData = nullptr;
+    ui8* RAMData = nullptr;
     ui8* m_bus;
 
     const char* path;
@@ -70,17 +70,17 @@ public:
 
     CartType cartType;
 
-    MBC* m_memory_rule;
+    MBC* memoryBankController;
 
     Cartridge(ui8* bus);
 
-    bool Load(const char* path);
-    void LoadMemoryRule();
-    ui8* GetRawData();
-    int GetRamSize() { return ramSize; }
-    ui8* GetRawRomMemory() { return dynamicMemory; }
-    ui8* GetRawRamMemory() { return ram; }
-    MBC* GetMBCRule() { return m_memory_rule; }
+    bool LoadCartridge(const char* path);
+    void LoadMBC();
+
+    ui8* GetROMData() { return ROMData; }
+    ui8* GetRAMData() { return RAMData; }
+	int GetRamSize() { return ramSize; }
+    MBC* GetMBCType() { return memoryBankController; }
 
     ui8 RamBankCount();
 

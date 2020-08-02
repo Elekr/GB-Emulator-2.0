@@ -10,9 +10,7 @@ typedef signed __int8 i8;
 typedef unsigned __int16 ui16; //16-bit Integer
 typedef signed __int16 i16;
 
-
-
-const int windowMultiplier = 6;
+const int WINDOW_MULTIPLIER = 6;
 
 const ui8 A_REGISTER = 1;
 const ui8 F_REGISTER = 0;
@@ -109,14 +107,14 @@ const ui8 CBCycles[256] = {
 //**** Timers
 //https://github.com/retrio/gb-test-roms/tree/master/instr_timing // Cycle timings
 
-const ui16 m_timer_divider_address = 0xFF04;
-const ui16 m_timer_address = 0xFF05;
-const ui16 m_timer_modulo_address = 0xFF06;
-const ui16 m_timer_controll_address = 0xFF07;
+const ui16 TIMER_DIV_REGISTER = 0xFF04;
+const ui16 TIMA_REGISTER = 0xFF05;
+const ui16 TIMER_MODULO_REGISTER = 0xFF06;
+const ui16 TIMER_CONTROL_REGISTER = 0xFF07;
 
 //**************************************************** JoyPad
 
-const int joypadCyclesRefresh = 65536;
+const int JOYPAD_CYCLES = 0x10000;
 
 enum JoyPad
 {
@@ -170,10 +168,10 @@ const int MIN_OAM_MODE_CYCLES = 80;
 const int MIN_LCD_TRANSFER_CYCLES = 172;
 const int VBLANK_CYCLES = 4560;
 
-const int lcdcRegister = 0xFF40;
-const int statusRegister = 0xFF41;
-const int LYRegister = 0xFF44;
-const int lycRegister = 0xFF45;
+const int LCDC_REGISTER = 0xFF40;
+const int STATUS_REGISTER = 0xFF41;
+const int LY_REGISTER = 0xFF44;
+const int LYC_REGISTER = 0xFF45;
 
 const int SCROLL_Y = 0xFF42;
 const int SCROLL_X = 0xFF43;
@@ -183,8 +181,8 @@ const int WINDOW_X = 0xFF4B;
 
 const int BACKGROUND_PALLETTE = 0xFF47;
 
-const ui16 m_cpu_interupt_flag_address = 0xFF0F;
-const ui16 m_interrupt_enabled_flag_address = 0xFFFF;
+const ui16 CPU_INTERUPT_REGISTER = 0xFF0F;
+const ui16 INTERUPT_ENABLED_REGISTER = 0xFFFF;
 
 const ui16 RESET_00 = 0x0000;
 const ui16 RESET_08 = 0x0008;
@@ -199,8 +197,9 @@ class GB
 {
 public:
 
-    Cartridge* m_cartridge;
+    Cartridge* cartridge;
     bool loaded;
+    bool SKIPBIOS = true;
 
     union //creates a union between the 8bit and 16bit registers - (automatically creates 16bit registers eg BC)
     {
@@ -257,10 +256,10 @@ public:
             ui8 internal_ram[0x7F];             // 0x7F
             ui8 interrupt;
         }bus;
-        ui8 m_bus[0x10000]; //64kb 
+        ui8 memoryBus[0x10000]; //64kb 
     };
 
-    ui8* busPtr = &m_bus[0];
+    ui8* busPtr = &memoryBus[0];
     ui8* dynamicPtr = nullptr;
 
     ui8 OPCode;
@@ -323,7 +322,6 @@ public:
     void Jr();
 
     void Jr(const ui16& address);
-
 
     void ADDHL(const ui16& reg);
 
@@ -394,15 +392,14 @@ public:
 
     //*************************************************************** JoyPad
 
-    ui8 joypadActual = 0xFF;
-    int m_joypadCycles = 0;
+    ui8 joypadRegister = 0xFF;
+    int joypadCycles = 0;
 
-    void JoyPadTick();
+    void TickJoypad();
     void UpdateJoyPad();
 
     void KeyPress(int key);
     void KeyRelease(int key);
-
 
     void HandleInput(SDL_Event& event);
 
@@ -414,19 +411,19 @@ public:
     //**** SDL Window
 
     pixelRGB* currentPallete = tintPallette;
+
     pixelRGB classicPallette[4] = { { 155,188,15 }, { 139,172,15 }, { 48,98,48 }, { 15,56,15 } };
     pixelRGB greyPallette[4] = { { 255,255,255 },{ 0xCC,0xCC,0xCC },{ 0x77,0x77,0x77 }, { 0x0,0x0,0x0 } };
     pixelRGB tintPallette[4] = { { 224,248,208 },{ 136,192,112 },{ 52,104,86 }, { 8,24,32 } };
     pixelRGB bluePallette[4] = { { 192,192,255 },{ 95,96,255 },{ 0,0,192 }, { 0,0,96 } };
 
-    static const unsigned int m_display_buffer_size = (160 * 144) * 4;
-
     ui8 frameBuffer[DISPLAY_HEIGHT * DISPLAY_WIDTH * 4]; // viewport region into the frame buffer
-    ui8 backBuffer[DISPLAY_HEIGHT * DISPLAY_WIDTH * 4]; // viewport region into the frame buffer
 
     bool lcdEnabled = false;
     bool vBlank = false;
+
     GPU_Mode currentMode;
+
     int modeClock = 0;
     int videoCycles = 0;
     int vBlankCycles = 0;
@@ -439,10 +436,10 @@ public:
     void DisableLCD();
     void EnableLCD();
 
-    bool updatePixels();
-    void drawScanline();
+    bool UpdatePixels();
+    void DrawScanline();
     void handleHBlankMode(ui8& line);
-    void handleVBlankMode(ui8& line, int cycles);
+    void handleVBlankMode(ui8& line);
     void handleOAMMode();
     void handleLCDTransferMode();
     //**** Rendering http://www.codeslinger.co.uk/pages/projects/gameboy/graphics.html
@@ -453,7 +450,6 @@ public:
     void RenderSprites();
     void RenderTile(bool unsig, ui16 tileMap, ui16 tileData, ui8 xPos, ui8 yPos, ui8 pixel, ui8 pallette);
     void switchPallete();
-    colours getColourFromPallette(ui8 pallete, colours originalColour);
 
     void DMATransfer(const ui8 data);
 

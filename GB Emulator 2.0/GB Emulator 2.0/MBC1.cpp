@@ -2,86 +2,70 @@
 #include <iostream>
 MBC1::MBC1(Cartridge* cart, ui8* bus) : MBC(cart, bus)
 {
-	m_memory_bank = 1;
-	m_mode = 0;
-	m_rom_bank_high = 0;
-	m_ram_offset = 0;
-	m_ram_enabled = false;
+	currentBank = 1;
+	currentMode = 0;
+	bankHigh = 0;
+	currentRAMBank = 0;
+	RAM_Enabled = false;
 }
 
 ui8* MBC1::GetRomBank0()
 {
-	return &m_cart->GetRawRomMemory()[0x0000];
+	return &cart->GetROMData()[0x0000];
 }
 
 ui8* MBC1::GetRomBank1()
 {
-	return &m_cart->GetRawRomMemory()[0x4000 * m_memory_bank];
+	return &cart->GetROMData()[0x4000 * currentBank];
 }
 
 void MBC1::Write(ui16 address, ui8 data)
 {
-	switch (address & 0xE000)
+	switch (address & 0xE000) //Mask the bits to obtain the 3 most significant bits. These can then be used to parse the request to the MBC
 	{
 	case 0x0000:
 		// Toggle Ram
-		if (m_cart->GetRamSize() > 0)
-			m_ram_enabled = ((data & 0x0F) == 0x0A);
+		if (cart->GetRamSize() > 0)
+		{
+			RAM_Enabled = ((data & 0x0F) == 0x0A);
+		}
 		break;
 	case 0x2000:
 		// Change rom bank
-		if (m_mode == 0)
+		if (currentMode == 0)
 		{
-			m_memory_bank = (data & 0x1F) | (m_rom_bank_high << 5);
+			currentBank = (data & 0x1F) | (bankHigh << 5);
 		}
 		else
 		{
-			m_memory_bank = data & 0x1f;
+			currentBank = data & 0x1f;
 		}
-
 		// Load memory bank 1
-		memcpy(&m_bus[0x4000], GetRomBank1(), 0x4000);
+		memcpy(&memoryBus[0x4000], GetRomBank1(), 0x4000);
 		break;
 	case 0x4000:
-		if (m_mode == 1)
+		if (currentMode == 1)
 		{
 			ui8 ramBank = address & 0x03;
-			ramBank &= (m_cart->RamBankCount() - 1);
-			m_ram_offset = ramBank * 0x2000;
+			ramBank &= (cart->RamBankCount() - 1);
+			currentRAMBank = ramBank * 0x2000;
 			// Load memory bank 1
-			memcpy(&m_bus[0xA000], &m_cart->GetRawRamMemory()[(address - 0xA000) + m_ram_offset], 0x2000);
+			memcpy(&memoryBus[0xA000], &cart->GetRAMData()[(address - 0xA000) + currentRAMBank], 0x2000);
 		}
 		else
 		{
-			m_rom_bank_high = data & 0x03;
+			bankHigh = data & 0x03;
 
 		}
-
 		break;
 	case 0x6000:
-		if (m_cart->GetRamSize() != 3 && data & 0x01)
-		{
-			//assert(0 && "Unable to change MBC1 to mode 1. Not enough ram banks!");
-		}
-
-		m_mode = data & 0x01;
+		currentMode = data & 0x01;
 		break;
 	case 0xA000:
-		if (m_ram_enabled)
+		if (RAM_Enabled)
 		{
-
-			if (m_cart->GetRamSize() == 1 && address >= 0xA800)
-			{
-				assert(0 && "Attempting to write out of ram range");
-			}
-
-			m_bus[address] = m_cart->GetRawRamMemory()[(address - 0xA000) + m_ram_offset] = data;
+			memoryBus[address] = cart->GetRAMData()[(address - 0xA000) + currentRAMBank] = data;
 		}
-		else
-		{
-			std::cout << "hi" << std::endl;
-		}
-
 		break;
 	}
 }

@@ -9,7 +9,7 @@ Cartridge::Cartridge(ui8* bus) : m_bus(bus)
 
 }
 
-bool Cartridge::Load(const char* path)
+bool Cartridge::LoadCartridge(const char* path)
 {
 	//http://www.cplusplus.com/doc/tutorial/files/
 	std::ifstream file(path, std::ios::ate | std::ios::binary); //ate sets the initial position to the end of the file (to parse the file size)
@@ -22,9 +22,9 @@ bool Cartridge::Load(const char* path)
 	//https://stackoverflow.com/questions/2409504/using-c-filestreams-fstream-how-can-you-determine-the-size-of-a-file
 	unsigned int fileSize = static_cast<int>(file.tellg());
 
-	dynamicMemory = new ui8[fileSize]; //Allocate memory for the rom 
+	ROMData = new ui8[fileSize]; //Allocate memory for the rom 
 	file.seekg(0, std::ios::beg);
-	file.read((char*)dynamicMemory, fileSize); //Cast to char
+	file.read((char*)ROMData, fileSize); //Cast to char
 	file.close();
 
 	//Used for debugging issues with loading the cart in
@@ -34,21 +34,28 @@ bool Cartridge::Load(const char* path)
 	//}
 
 	//Get the title of the Game
+
 	char* name = new char[20];
 
-	for (int i = 0; i < 10; i++)
+	for (int i = 0; i < 20; i++)
 	{
-		name[i] = dynamicMemory[TITLE_LOC + i];	
+		name[i] = ROMData[TITLE_LOC + i];	
 	}
 	gameTitle = name;
 
-	dynamicMemory[CGB] == 0x80;
+	ROMData[CGB] == 0x80; //Set to not color mode (Gameboy Color not implemented yet)
 
-	cartType = (CartType)dynamicMemory[CART_TYPE];
+	cartType = (CartType)ROMData[CART_TYPE];
 
-	destinationCode = dynamicMemory[DEST_CODE];
+	destinationCode = ROMData[DEST_CODE];
+	romSize = ROMData[ROM_SIZE];
+	ramSize = ROMData[RAM_SIZE];
 
-	ramSize = dynamicMemory[RAM_SIZE];
+	std::cout << "Game: " << gameTitle << std::endl;
+	std::cout << "Cartridge Type: " << cartType << std::endl;
+	std::cout << "ROM Banks: " << romSize << std::endl;
+	std::cout << "RAM Size: " << ramSize << std::endl;
+	std::cout << "Destination Code: " << destinationCode << std::endl;
 
 	switch (ramSize)
 	{
@@ -66,78 +73,49 @@ bool Cartridge::Load(const char* path)
 		break;
 	}
 
-	LoadMemoryRule();
-
-	//if (m_memory_rule->HasRam() && ramSize == 0)
-	//{
-	//	m_raw_ram_size = 0x1024 * 128;
-	//}
+	LoadMBC();
 
 	if (rawRamSize > 0)
 	{
-		ram = new ui8[rawRamSize]{ 0 };
+		RAMData = new ui8[rawRamSize]{ 0 }; //Create RAM if it exists
 	}
 
 	return true;
 }
 
-void Cartridge::LoadMemoryRule()
+void Cartridge::LoadMBC()
 {
 	switch (cartType)
 	{
 	case CartType::ROM_ONLY:
 	{
-		m_memory_rule = new RomOnly(this, m_bus);
+		memoryBankController = new RomOnly(this, m_bus);
 	}
 	break;
 	case CartType::ROM_AND_MBC1:
 	{
-		m_memory_rule = new MBC1(this, m_bus);
+		memoryBankController = new MBC1(this, m_bus);
 	}
 	break;
-
 	case CartType::ROM_AND_MBC1_AND_RAM:
 	{
-		m_memory_rule = new MBC1(this, m_bus);
+		memoryBankController = new MBC1(this, m_bus);
 	}
 	break;
-
-
 	case CartType::ROM_AND_MBC1_AND_RAM_AND_BATT:
 	{
-		m_memory_rule = new MBC1(this, m_bus);
+		memoryBankController = new MBC1(this, m_bus);
 	}
 	break;
-
-	case CartType::ROM_ANDMMMD1_AND_SRAM_AND_BATT:
-	{
-		
-	}
-	break;
-
-
-
 	case CartType::ROM_AND_MBC3_AND_RAM_BATT:
 	{
-		m_memory_rule = new MBC1(this, m_bus);
+		memoryBankController = new MBC1(this, m_bus);
 	}
 	break;
-
-	case CartType::ROM_AND_MBC5_AND_RAM_AND_BATT:
-	{
-	
-	}
-	break;
-
 	default:
-		exit(0);
+		exit(0); //Unknown Cart type
 		break;
 	}
-}
-
-ui8* Cartridge::GetRawData()
-{
-	return dynamicMemory;
 }
 
 ui8 Cartridge::RamBankCount()
