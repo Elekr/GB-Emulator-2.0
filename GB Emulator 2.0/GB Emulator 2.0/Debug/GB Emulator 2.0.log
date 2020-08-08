@@ -1,8 +1,8 @@
 ﻿  GB.cpp
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(894,24): warning C4553: '==': result of expression not used; did you intend '='?
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(1019,24): warning C4305: '-=': truncation from 'int' to 'ui8'
-  main.cpp
-C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\main.cpp(95,13): warning C4018: '<': signed/unsigned mismatch
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\GB.cpp(873,24): warning C4553: '==': result of expression not used; did you intend '='?
+  MBC.cpp
   MBC1.cpp
+  main.cpp
+C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\GB Emulator 2.0\main.cpp(106,13): warning C4018: '<': signed/unsigned mismatch
   Generating Code...
   GB Emulator 2.0.vcxproj -> C:\Users\Tom\Documents\GB-Emulator-2.0\GB Emulator 2.0\Debug\GB Emulator 2.0.exe

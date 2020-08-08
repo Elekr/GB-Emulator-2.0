@@ -110,16 +110,6 @@ void GB::Reset()
 		frameBuffer[i] = 0x0; //Resets the display
 	}
 
-	for (int i = 0; i < BIOS_SIZE; i++)
-	{
-		memoryBus[i] = BIOS[i];
-	}
-
-	for (int i = 0x8000; i < 0x8000; i++)
-	{
-		memoryBus[i] = 0x0;
-	}
-
 	ReadData(LY_REGISTER) = 144; //Sets the current display line (will reset to 0)
 
 	interruptsEnabled = false; //Disabled by default
@@ -231,10 +221,7 @@ void GB::WriteData(ui16 address, ui8 data)
 		{
 				if (data == 0) //Adds the BIOS to the Memory Bus
 				{
-					for (int i = 0; i < BIOS_SIZE; i++)
-					{
-						memoryBus[i] = BIOS[i];
-					}
+
 				}
 				else
 				{
@@ -565,7 +552,7 @@ void GB::ADDHL(const ui16& reg)
 		SetFlag(FLAG_CARRY, true);
 	}
 
-	if ((GetWordRegister(HL_REGISTER) ^ reg ^ (result & 0x10000)) & 0x1000) //Half of the bits set
+	if ((GetWordRegister(HL_REGISTER) ^ reg ^ (result & 0xFFFF)) & 0x1000) //Half of the bits set
 	{
 		SetFlag(FLAG_HALFCARRY, true);
 	}
@@ -1218,34 +1205,34 @@ void GB::OP26() { SetByteRegister(H_REGISTER, ReadByte()); }; // LD H, ui8
 void GB::OP27() 
 {
 //https://www.reddit.com/r/EmuDev/comments/6wge9z/some_help_debugging_blarggs_game_boy_test_roms/ Info on DAA function
-	int a_reg = GetByteRegister(A_REGISTER);
+	int Temp_A = GetByteRegister(A_REGISTER);
 
 	if (!CheckFlag(FLAG_SUBTRACT))
 	{
-		if (CheckFlag(FLAG_HALFCARRY) || ((a_reg & 0xF) > 9))
-			a_reg += 0x06;
+		if (CheckFlag(FLAG_HALFCARRY) || ((Temp_A & 0xF) > 9))
+			Temp_A += 0x06;
 
-		if (CheckFlag(FLAG_CARRY) || (a_reg > 0x9F))
-			a_reg += 0x60;
+		if (CheckFlag(FLAG_CARRY) || (Temp_A > 0x9F))
+			Temp_A += 0x60;
 	}
 	else
 	{
 		if (CheckFlag(FLAG_HALFCARRY))
-			a_reg = (a_reg - 6) & 0xFF;
+			Temp_A = (Temp_A - 6) & 0xFF;
 
 		if (CheckFlag(FLAG_CARRY))
-			a_reg -= 0x60;
+			Temp_A -= 0x60;
 	}
 	SetFlag(FLAG_HALFCARRY, false);
 
-	if ((a_reg & 0x100) == 0x100)
+	if ((Temp_A & 0x100) == 0x100)
 		SetFlag(FLAG_CARRY, true);
 
-	a_reg &= 0xFF;
+	Temp_A &= 0xFF;
 
-	SetFlag(FLAG_ZERO, a_reg == 0);
+	SetFlag(FLAG_ZERO, Temp_A == 0);
 
-	SetByteRegister(A_REGISTER, a_reg);
+	SetByteRegister(A_REGISTER, Temp_A);
 }; // DAA
 void GB::OP28() 
 {
@@ -3460,7 +3447,7 @@ void GB::RenderTile(bool unsig, ui16 tileMap, ui16 tileData, ui8 xPos, ui8 yPos,
 
 	int pixelIndex = pixel + (DISPLAY_WIDTH * line);
 	//Retrieve the colour values of the pixel from the pallette
-	pixelRGB colour = currentPallete[(pallette, colours(colourNum))];
+	pixelRGB colour = currentPallete[getColourFromPallette(pallette, colours(colourNum))];
 
 	//Store them in the framebuffer
 	frameBuffer[pixelIndex * 4] = colour.blue;
@@ -3487,6 +3474,57 @@ void GB::switchPallete() //Used to switch between the different colour palettes
 		currentPallete = classicPallette;
 	}
 }
+
+colours GB::getColourFromPallette(ui8 pallete, colours originalColour)
+{
+	ui8 colourNumber = 0;
+	switch (originalColour)
+	{
+	case WHITE:
+		if (HasBit(pallete, 1))
+		{
+			SetBit(colourNumber, 1);
+		}
+		if (HasBit(pallete, 0))
+		{
+			SetBit(colourNumber, 0);
+		}
+		break;
+	case LIGHT_GREY:
+		if (HasBit(pallete, 3))
+		{
+			SetBit(colourNumber, 1);
+		}
+		if (HasBit(pallete, 2))
+		{
+			SetBit(colourNumber, 0);
+		}
+		break;
+	case DARK_GREY:
+		if (HasBit(pallete, 5))
+		{
+			SetBit(colourNumber, 1);
+		}
+		if (HasBit(pallete, 4))
+		{
+			SetBit(colourNumber, 0);
+		}
+		break;
+	case BLACK:
+		if (HasBit(pallete, 7))
+		{
+			SetBit(colourNumber, 1);
+		}
+		if (HasBit(pallete, 6))
+		{
+			SetBit(colourNumber, 0);
+		}
+		break;
+	}
+
+	return colours(colourNumber);
+}
+
 
 void GB::DMATransfer(const ui8 data) //Used for sprites
 {

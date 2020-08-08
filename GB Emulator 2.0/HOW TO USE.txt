@@ -1,0 +1,9 @@
+How to use the Emulator:
+
+The emulator uses SDL2 which can be found at https://www.libsdl.org/
+The default test for the Emulator is the blargs "cpu_instrs.gb" test found at https://github.com/retrio/gb-test-roms/tree/master/cpu_instrs
+
+1)If using Visual Studio 2019 change the line "gameboy->InitEMU("cpu_instrs.gb");" by replacing the "cpu_instrs" with the ROM file name
+2a)If using Command prompt, change the directory to the location of the emulator. For example, "C:\Users\Tom\Documents\GB Emulator 2.0
+2b)Start the emulator by entering "start GB Emulator 2.0.exe gamename.gb" replacing gamename with the name of the ROM file.
+

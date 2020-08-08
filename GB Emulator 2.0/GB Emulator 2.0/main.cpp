@@ -19,13 +19,14 @@ int main(int argc, char* argv[])
 	}
 	else
 	{
-		gameboy->InitEMU("cpu_instrs.gb"); //Defaults to Blargg's as public use ROM
+		//(CHANGE STRING TO SELECT GAME)
+		gameboy->InitEMU("cpu_instrs.gb"); //Defaults to Blargg's as public use ROM 
 	}
 
-	//********* GAMES (Usedf for testing purposes)
+	//********* GAMES (Used for testing purposes)	
 
 	//**** ROM Only
-	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/DrMario.gb");
+	gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/DrMario.gb");
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Tetris.gb"); 
 
 	//https://fladnag.net/downloads/telephone/palm/APPS/Liberty1.25/rom2pdb.c Fix for tetris (If interrupts are not implemented)
@@ -35,13 +36,12 @@ int main(int argc, char* argv[])
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Super Mario Land.gb");
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Game Boy Gallery.gb");
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Kirby's Dream Land.gb");
+
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Pokemon Red.gb");
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/pocket.gb");
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Metroid II.gb");
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/LOZ_LA.gb");
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Super Mario Land 2.gb"); // (cursed)
-
-
 
 	//**** TESTS BLARGGS All Passed
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/cpu_individual/01-special.gb");
@@ -58,7 +58,6 @@ int main(int argc, char* argv[])
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/cpu_individual/cpu_instrs.gb"); 
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/instr_timing.gb"); 
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/interrupt_time.gb");
-
 
 	//**** TESTS MOONEYE Some Pass but further development required
 	//gameboy->InitEMU("C:/users/Tom/Documents/GB-Emulator-2.0/Games/acceptance/interrupts/ie_push.gb"); //PASSED
