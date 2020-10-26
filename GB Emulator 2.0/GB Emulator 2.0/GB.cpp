@@ -26,7 +26,7 @@ bool GB::InitEMU(const char* path)
 	loaded = cartridge->LoadCartridge(path); //Loads the ROM into the Cartridge Class
 	if (!loaded)return false;
 	memcpy(memoryBus, cartridge->GetROMData(), 0x8000); //Put the first two banks into the bus
-	//addBIOS(); // Displays the Nintendo boot sequence, disabled by default.
+	addBIOS(); // Displays the Nintendo boot sequence, disabled by default.
 	if (SKIPBIOS)
 	{
 		SkipBIOS();

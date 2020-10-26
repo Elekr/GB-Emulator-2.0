@@ -26,16 +26,16 @@ int main(int argc, char* argv[])
 	//********* GAMES (Used for testing purposes)	
 
 	//**** ROM Only
-	gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/DrMario.gb");
+	//gameboy->InitEMU("D:/roms/gb/DrMario.gb");
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Tetris.gb"); 
 
 	//https://fladnag.net/downloads/telephone/palm/APPS/Liberty1.25/rom2pdb.c Fix for tetris (If interrupts are not implemented)
 	//https://www.reddit.com/r/EmuDev/comments/6sxb09/gb_tetris_stuck_at_copyright_screen/ // Tetris bugs intentional
 
 	//**** MBC1
-	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Super Mario Land.gb");
-	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Game Boy Gallery.gb");
-	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Kirby's Dream Land.gb");
+	//gameboy->InitEMU("D:/roms/gb/Super Mario Land.gb");
+	//gameboy->InitEMU("D:/roms/gb/Game Boy Gallery.gb");
+	gameboy->InitEMU("D:/roms/gb/Kirby's Dream Land.gb");
 
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/Pokemon Red.gb");
 	//gameboy->InitEMU("C:/Users/Tom/Documents/GB-Emulator-2.0/Games/pocket.gb");
